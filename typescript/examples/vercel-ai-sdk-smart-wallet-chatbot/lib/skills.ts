@@ -1,4 +1,4 @@
-export type BantzzSkill = {
+export type BantABroSkill = {
   name:
     | "wallet-auth-gate"
     | "trade-confirmation"
@@ -10,12 +10,12 @@ export type BantzzSkill = {
 };
 
 /**
- * Resolve the preferred Bantzz web app URL for redirects and onboarding.
+ * Resolve the preferred Bant-A-Bro web app URL for redirects and onboarding.
  *
  * @returns Configured web URL or localhost fallback
  */
-export function getBantzzWebUrl(): string {
-  return process.env.BANTZZ_WEB_URL || "http://localhost:3000";
+export function getBantABroWebUrl(): string {
+  return process.env.BANT_A_BRO_WEB_URL || process.env.BANTZZ_WEB_URL || "http://localhost:3000";
 }
 
 /**
@@ -23,8 +23,8 @@ export function getBantzzWebUrl(): string {
  *
  * @returns Skill definitions for the chatbot runtime
  */
-export function getBantzzSkills(): BantzzSkill[] {
-  const webUrl = getBantzzWebUrl();
+export function getBantABroSkills(): BantABroSkill[] {
+  const webUrl = getBantABroWebUrl();
 
   return [
     {
@@ -39,7 +39,7 @@ export function getBantzzSkills(): BantzzSkill[] {
     },
     {
       name: "twitter-wallet-redirect",
-      instructions: `If a request comes from a Twitter mention and it involves personal wallet creation, funding, sending, buying, selling, or swapping, do not treat the mention alone as sufficient authentication. Redirect the user to the Bantzz web app at ${webUrl} so they can sign in first, then continue there.`,
+      instructions: `If a request comes from a Twitter mention and it involves personal wallet creation, funding, sending, buying, selling, or swapping, do not treat the mention alone as sufficient authentication. Redirect the user to the Bant-A-Bro web app at ${webUrl} so they can sign in first, then continue there.`,
     },
     {
       name: "viral-twitter-replies",
@@ -62,14 +62,14 @@ export function getBantzzSkills(): BantzzSkill[] {
 /**
  * Build the main skills section for the shared agent system prompt.
  *
- * @returns Prompt text for the active Bantzz skills
+ * @returns Prompt text for the active Bant-A-Bro skills
  */
 export function buildSkillsPrompt(): string {
-  const skills = getBantzzSkills()
+  const skills = getBantABroSkills()
     .map(skill => `- ${skill.name}: ${skill.instructions}`)
     .join("\n");
 
-  return `Active Bantzz skills:\n${skills}`;
+  return `Active Bant-A-Bro skills:\n${skills}`;
 }
 
 /**
@@ -78,9 +78,9 @@ export function buildSkillsPrompt(): string {
  * @returns Prompt text tailored for public mention replies
  */
 export function buildTwitterWorkerSkillsPrompt(): string {
-  const webUrl = getBantzzWebUrl();
+  const webUrl = getBantABroWebUrl();
 
-  return `Apply these Bantzz Twitter skills while drafting replies:
+  return `Apply these Bant-A-Bro Twitter skills while drafting replies:
 - twitter-wallet-redirect: If a mention asks for a personal wallet action like wallet creation, funding, sending, buying, selling, or swapping, redirect the user to ${webUrl} to sign in first instead of pretending the action can happen from a public mention.
 - viral-twitter-replies: Keep the reply concise, human, direct, and socially native.
 - onboarding-assistant: If the user seems new, explain only the next step they should take.

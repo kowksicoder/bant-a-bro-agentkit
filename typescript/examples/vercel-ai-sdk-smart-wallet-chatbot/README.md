@@ -68,7 +68,7 @@ Tool results are printed during streaming so you can see what the agent actually
 
 ## Built-in behavior skills
 
-The shared agent prompt now includes these Bantzz behavior skills:
+The shared agent prompt now includes these Bant-A-Bro behavior skills:
 
 - `wallet-auth-gate`: check Agentic Wallet auth before personal wallet send or trade actions
 - `trade-confirmation`: restate buy, sell, and swap intents and ask for explicit confirmation before execution
@@ -83,9 +83,16 @@ The agent also reads local project knowledge from:
 
 - `knowledge/project.md`
 
+The agent also reads local knowledge-skill markdown from:
+
+- `knowledge/skills/contract-addresses.md`
+- `knowledge/skills/security.md`
+- `knowledge/skills/frontend-ux.md`
+- `knowledge/skills/ens-primary-name.md`
+
 Use this file as the editable source of truth for:
 
-- what Bantzz is
+- what Bant-A-Bro is
 - current product direction
 - supported features
 - product rules
@@ -98,7 +105,7 @@ If you want to expand later, split the knowledge base into additional markdown f
 
 - `lib/agenticWallet.ts`: local Agentic Wallet service wrapper around the `awal` CLI; handles status, login, verification, address, balance, send, trade, and companion-window opening
 - `lib/knowledge.ts`: local project knowledge loader that injects `knowledge/project.md` into the shared prompt
-- `knowledge/project.md`: editable project about/knowledge-base markdown for Bantzz
+- `knowledge/project.md`: editable project about/knowledge-base markdown for Bant-A-Bro
 - `lib/twitter.ts`: local Twitter service using `twitter-api-v2`; handles posting tweets, reading mentions, and replying
 - `lib/agent.ts`: shared agent initialization, merged tool registration, environment checks, and prompt assembly
 - `web/server.ts`: local HTTP server that exposes a browser chat endpoint and streams model output plus tool results
@@ -140,7 +147,8 @@ Rename `.env-local` to `.env` and fill in:
 - `TWITTER_API_SECRET`
 - `TWITTER_ACCESS_TOKEN`
 - `TWITTER_ACCESS_TOKEN_SECRET`
-- `BANTZZ_WEB_URL` optional, defaults to `http://localhost:3000`
+- `BANT_A_BRO_WEB_URL` optional, defaults to `http://localhost:3000`
+- `BANTZZ_WEB_URL` also works as a backward-compatible fallback
 - `NETWORK_ID` optional, defaults to `base-sepolia`
 
 ## Build

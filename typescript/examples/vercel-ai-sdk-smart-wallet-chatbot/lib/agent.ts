@@ -26,7 +26,7 @@ import {
   tradeAgenticWallet,
   verifyAgenticWallet,
 } from "./agenticWallet";
-import { buildProjectKnowledgePrompt } from "./knowledge";
+import { buildKnowledgePrompt } from "./knowledge";
 import { buildSkillsPrompt } from "./skills";
 import { getMentions, hasTwitterCredentials, postTweet, replyToTweet } from "./twitter";
 
@@ -403,7 +403,7 @@ function createSystemPrompt(options: { canUseFaucet: boolean; twitterEnabled: bo
     ? "If you ever need funds, you can request them from the faucet."
     : "If you need funds, you can provide your wallet details and request funds from the user.";
   const skillsMessage = buildSkillsPrompt();
-  const projectKnowledgeMessage = buildProjectKnowledgePrompt();
+  const knowledgeMessage = buildKnowledgePrompt();
 
   const agenticWalletMessage = `You also have Agentic Wallet tools for a user-authenticated wallet session.
 Use agentic_wallet_auth_login when the user wants to create or sign in to their own wallet with email.
@@ -428,7 +428,7 @@ If the user says "Reply to my latest mention", call get_mentions first, choose t
 You are empowered to interact onchain using your tools. ${faucetMessage}
 Before executing your first smart-wallet action, get the smart-wallet details to see what network you're on.
 ${skillsMessage}
-${projectKnowledgeMessage}
+${knowledgeMessage}
 ${agenticWalletMessage}
 ${twitterMessage}
 If there is a 5XX (internal) HTTP error code, ask the user to try again later.
