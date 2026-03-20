@@ -1,146 +1,29 @@
-import {
-  AgentKit,
-  cdpApiActionProvider,
-  erc20ActionProvider,
-  pythActionProvider,
-  walletActionProvider,
-  CdpSmartWalletProvider,
-} from "@coinbase/agentkit";
-import { getVercelAITools } from "@coinbase/agentkit-vercel-ai-sdk";
-import { openai } from "@ai-sdk/openai";
-import { streamText, ToolSet, stepCountIs } from "ai";
 import * as dotenv from "dotenv";
 import * as readline from "readline";
-import * as fs from "fs";
-import { Address } from "viem";
+import { streamText } from "ai";
+import {
+  createExampleAgent,
+  formatToolOutput,
+  type ExampleAgent,
+  type ExampleMessage,
+} from "./lib/agent";
 
 dotenv.config();
 
-type WalletData = {
-  smartAccountName?: string;
-  smartWalletAddress: Address;
-  ownerAddress: Address;
-};
-
 /**
- * Validates that required environment variables are set
+ * Run the chatbot in interactive mode.
  *
- * @throws {Error} - If required environment variables are missing
- * @returns {void}
- */
-function validateEnvironment(): void {
-  const missingVars: string[] = [];
-
-  // Check required variables
-  const requiredVars = ["OPENAI_API_KEY", "CDP_API_KEY_ID", "CDP_API_KEY_SECRET"];
-  requiredVars.forEach(varName => {
-    if (!process.env[varName]) {
-      missingVars.push(varName);
-    }
-  });
-
-  // Exit if any required variables are missing
-  if (missingVars.length > 0) {
-    console.error("Error: Required environment variables are not set");
-    missingVars.forEach(varName => {
-      console.error(`${varName}=your_${varName.toLowerCase()}_here`);
-    });
-    process.exit(1);
-  }
-
-  // Warn about optional NETWORK_ID
-  if (!process.env.NETWORK_ID) {
-    console.warn("Warning: NETWORK_ID not set, defaulting to base-sepolia testnet");
-  }
-}
-
-// Add this right after imports and before any other code
-validateEnvironment();
-
-const system = `You are a helpful agent that can interact onchain using the Coinbase Developer Platform AgentKit. You are
-empowered to interact onchain using your tools. If you ever need funds, you can request them from the
-faucet if you are on network ID 'base-sepolia'. If not, you can provide your wallet details and request
-funds from the user. Before executing your first action, get the wallet details to see what network
-you're on. If there is a 5XX (internal) HTTP error code, ask the user to try again later. If someone
-asks you to do something you can't do with your currently available tools, you must say so, and
-encourage them to implement it themselves using the CDP SDK + Agentkit, recommend they go to
-docs.cdp.coinbase.com for more information. Be concise and helpful with your responses. Refrain from
-restating your tools' descriptions unless it is explicitly requested.`;
-
-/**
- * Initialize the agent with CDP Agentkit and Vercel AI SDK tools
- *
- * @returns Object containing initialized tools
- * @throws Error if initialization fails
- */
-async function initializeAgent() {
-  try {
-    const networkId = process.env.NETWORK_ID || "base-sepolia";
-    const walletDataFile = `wallet_data_${networkId.replace(/-/g, "_")}.txt`;
-
-    let walletData: WalletData | null = null;
-    let smartAccountName: string | undefined = undefined;
-    let smartWalletAddress: Address | undefined = undefined;
-    let ownerAddress: Address | undefined = undefined;
-    // Read existing wallet data if available
-    if (fs.existsSync(walletDataFile)) {
-      try {
-        walletData = JSON.parse(fs.readFileSync(walletDataFile, "utf8")) as WalletData;
-        smartAccountName = walletData.smartAccountName;
-        smartWalletAddress = walletData.smartWalletAddress;
-        ownerAddress = walletData.ownerAddress;
-      } catch (error) {
-        console.error(`Error reading wallet data for ${networkId}:`, error);
-        // Continue without wallet data
-      }
-    }
-
-    // Configure Smart Wallet Provider
-    const walletProvider = await CdpSmartWalletProvider.configureWithWallet({
-      networkId,
-      smartAccountName,
-      address: smartWalletAddress,
-      owner: ownerAddress,
-    });
-
-    const agentKit = await AgentKit.from({
-      walletProvider,
-      actionProviders: [
-        cdpApiActionProvider(),
-        erc20ActionProvider(),
-        pythActionProvider(),
-        walletActionProvider(),
-      ],
-    });
-
-    const data = await walletProvider.exportWallet();
-
-    // Save wallet data
-    fs.writeFileSync(
-      walletDataFile,
-      JSON.stringify({
-        smartAccountName: data.name,
-        smartWalletAddress: data.address,
-        ownerAddress: data.ownerAddress,
-      } as WalletData),
-    );
-
-    const tools = getVercelAITools(agentKit);
-    return { tools };
-  } catch (error) {
-    console.error("Failed to initialize agent:", error);
-    throw error;
-  }
-}
-
-/**
- * Run the chatbot in interactive mode
- *
- * @param tools - Record of Vercel AI SDK tools from AgentKit
+ * @param agent - Shared agent configuration
  * @returns Promise that resolves when chat session ends
  */
-async function runChatMode(tools: ToolSet) {
+async function runChatMode(agent: ExampleAgent) {
   console.log("Starting chat mode... Type 'exit' to end.");
+
+  if (agent.twitterEnabled) {
+    console.log("Twitter tools enabled: post_tweet, get_mentions, reply_to_tweet.");
+  } else {
+    console.log("Twitter tools disabled. Add Twitter credentials to enable X automation.");
+  }
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -150,7 +33,7 @@ async function runChatMode(tools: ToolSet) {
   const question = (prompt: string): Promise<string> =>
     new Promise(resolve => rl.question(prompt, resolve));
 
-  const messages: Parameters<typeof streamText>[0]["messages"] = [];
+  const messages: ExampleMessage[] = [];
 
   try {
     // eslint-disable-next-line no-constant-condition
@@ -165,14 +48,14 @@ async function runChatMode(tools: ToolSet) {
       messages.push({ role: "user", content: userInput });
 
       const result = streamText({
-        model: openai.chat("gpt-4o-mini"),
+        model: agent.model,
         messages,
-        tools,
-        system,
-        stopWhen: stepCountIs(10),
+        tools: agent.tools,
+        system: agent.system,
+        stopWhen: agent.stopWhen,
         onStepFinish: async ({ toolResults }) => {
           for (const tr of toolResults) {
-            console.log(`Tool ${tr.toolName}: ${tr.output}`);
+            console.log(`Tool ${tr.toolName}: ${formatToolOutput(tr.output)}`);
           }
         },
       });
@@ -187,7 +70,6 @@ async function runChatMode(tools: ToolSet) {
       }
 
       messages.push({ role: "assistant", content: fullResponse });
-
       console.log("-------------------");
     }
   } catch (error) {
@@ -198,34 +80,34 @@ async function runChatMode(tools: ToolSet) {
 }
 
 /**
- * Run the agent autonomously with specified intervals
+ * Run the agent autonomously with specified intervals.
  *
- * @param tools - Record of Vercel AI SDK tools from AgentKit
+ * @param agent - Shared agent configuration
  * @param interval - Time interval between actions in seconds
  */
-async function runAutonomousMode(tools: ToolSet, interval = 10) {
+async function runAutonomousMode(agent: ExampleAgent, interval = 10) {
   console.log("Starting autonomous mode...");
 
-  const messages: Parameters<typeof streamText>[0]["messages"] = [];
+  const messages: ExampleMessage[] = [];
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
-      const thought =
-        "Be creative and do something interesting on the blockchain. " +
-        "Choose an action or set of actions and execute it that highlights your abilities.";
+      const thought = agent.twitterEnabled
+        ? "Be creative and do something interesting using your onchain wallet or Twitter account. Choose an action or set of actions that highlights your abilities."
+        : "Be creative and do something interesting onchain. Choose an action or set of actions that highlights your abilities.";
 
       messages.push({ role: "user", content: thought });
 
       const result = streamText({
-        model: openai.chat("gpt-4o-mini"),
+        model: agent.model,
         messages,
-        tools,
-        system,
-        stopWhen: stepCountIs(10),
+        tools: agent.tools,
+        system: agent.system,
+        stopWhen: agent.stopWhen,
         onStepFinish: async ({ toolResults }) => {
           for (const tr of toolResults) {
-            console.log(`Tool ${tr.toolName}: ${tr.output}`);
+            console.log(`Tool ${tr.toolName}: ${formatToolOutput(tr.output)}`);
           }
         },
       });
@@ -240,7 +122,6 @@ async function runAutonomousMode(tools: ToolSet, interval = 10) {
       }
 
       messages.push({ role: "assistant", content: fullResponse });
-
       console.log("-------------------");
 
       await new Promise(resolve => setTimeout(resolve, interval * 1000));
@@ -254,7 +135,7 @@ async function runAutonomousMode(tools: ToolSet, interval = 10) {
 }
 
 /**
- * Choose whether to run in autonomous or chat mode based on user input
+ * Choose whether to run in autonomous or chat mode based on user input.
  *
  * @returns Selected mode
  */
@@ -280,28 +161,29 @@ async function chooseMode(): Promise<"chat" | "auto"> {
     if (choice === "1" || choice === "chat") {
       rl.close();
       return "chat";
-    } else if (choice === "2" || choice === "auto") {
+    }
+
+    if (choice === "2" || choice === "auto") {
       rl.close();
       return "auto";
     }
+
     console.log("Invalid choice. Please try again.");
   }
 }
 
 /**
- * Main entry point for the chatbot application
- * Initializes the agent and starts chat mode
- *
- * @throws Error if initialization or chat mode fails
+ * Main entry point for the chatbot application.
  */
 async function main() {
   try {
-    const { tools } = await initializeAgent();
+    const agent = await createExampleAgent();
     const mode = await chooseMode();
+
     if (mode === "chat") {
-      await runChatMode(tools);
+      await runChatMode(agent);
     } else {
-      await runAutonomousMode(tools);
+      await runAutonomousMode(agent);
     }
   } catch (error) {
     console.error("Error:", error);

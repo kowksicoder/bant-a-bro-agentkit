@@ -1,64 +1,145 @@
-# CDP AgentKit Vercel AI SDK Extension Examples - Chatbot Typescript
+# CDP AgentKit Vercel AI SDK Smart Wallet + Twitter Chatbot Example
 
-This example demonstrates an agent setup as a terminal style chatbot with access to the full set of CDP AgentKit actions.
+This example keeps the existing Vercel AI SDK smart wallet chatbot and extends it with Twitter (X) automation. The chatbot still runs as a terminal app, and now it can:
 
-## Ask the chatbot to engage in the Web3 ecosystem!
+- manage the smart wallet with AgentKit tools
+- post tweets
+- fetch account mentions
+- reply to tweets and mentions
+- serve a local browser chat page
+- run a separate background worker that auto-replies to new mentions
+
+## Example chat commands
 
 - "Transfer a portion of your ETH to a random address"
 - "What is the price of BTC?"
-- "Deploy an NFT that will go super viral!"
-- "Deploy an ERC-20 token with total supply 1 billion"
+- "Post this tweet: GM world"
+- "Check my mentions"
+- "Reply to my latest mention"
+- "Reply to tweet 1901234567890123456 with thanks for reaching out"
+
+## How the agent uses Twitter tools
+
+The chatbot merges the standard AgentKit Vercel AI SDK tools with three example-local Twitter tools:
+
+- `post_tweet`
+- `get_mentions`
+- `reply_to_tweet`
+
+The system prompt tells the model when to use each tool. In practice:
+
+- for "Post this tweet: ..." it should call `post_tweet`
+- for "Check my mentions" it should call `get_mentions`
+- for "Reply to my latest mention" it should call `get_mentions` first, then `reply_to_tweet`
+
+Tool results are printed during streaming so you can see what the agent actually executed.
+
+## New files
+
+- `lib/twitter.ts`: local Twitter service using `twitter-api-v2`; handles posting tweets, reading mentions, and replying
+- `lib/agent.ts`: shared agent initialization, merged tool registration, environment checks, and prompt assembly
+- `web/server.ts`: local HTTP server that exposes a browser chat endpoint and streams model output plus tool results
+- `web/index.html`: single-page chat UI wired into the same agent
+- `workers/twitterWorker.ts`: background worker that polls mentions every 15 seconds, drafts replies with the agent, posts them, and persists processed tweet IDs
+- `twitter_worker_state.json`: created automatically the first time the worker runs to avoid duplicate replies
 
 ## Prerequisites
 
-### Checking Node Version
+### Node.js
 
-Before using the example, ensure that you have the correct version of Node.js installed. The example requires Node.js 18 or higher. You can check your Node version by running:
+The example requires Node.js 18 or higher.
 
 ```bash
 node --version
 ```
 
-If you don't have the correct version, you can install it using [nvm](https://github.com/nvm-sh/nvm):
+If needed:
 
 ```bash
 nvm install node
 ```
 
-This will automatically install and use the latest version of Node.
+### API keys
 
-### API Keys
-
-You'll need the following API keys:
+You will need:
 
 - [CDP API Key](https://portal.cdp.coinbase.com/access/api)
 - [OpenAI API Key](https://platform.openai.com/docs/quickstart#create-and-export-an-api-key)
+- [Twitter (X) Developer credentials](https://developer.x.com/en/portal/dashboard)
 
-Once you have them, rename the `.env-local` file to `.env` and make sure you set the API keys to their corresponding environment variables:
+Rename `.env-local` to `.env` and fill in:
 
-- "CDP_API_KEY_ID"
-- "CDP_API_KEY_SECRET"
-- "OPENAI_API_KEY"
-- "PRIVATE_KEY" (optional, will generate a new private key if not provided)
+- `CDP_API_KEY_ID`
+- `CDP_API_KEY_SECRET`
+- `CDP_WALLET_SECRET`
+- `OPENAI_API_KEY`
+- `TWITTER_API_KEY`
+- `TWITTER_API_SECRET`
+- `TWITTER_ACCESS_TOKEN`
+- `TWITTER_ACCESS_TOKEN_SECRET`
+- `NETWORK_ID` optional, defaults to `base-sepolia`
 
-## Running the example
+## Build
 
-From the root directory, run:
-
-```bash
-npm install
-npm run build
-```
-
-This will install the dependencies and build the packages locally. The chatbot example uses the local `@coinbase/agentkit-vercel-ai-sdk` and `@coinbase/agentkit` packages. If you make changes to the packages, you can run `npm run build` from root again to rebuild the packages, and your changes will be reflected in the chatbot example.
-
-Now from the `typescript/examples/vercel-ai-sdk-smart-wallet-chatbot` directory, run:
+From the `typescript` directory, install dependencies and build the workspace:
 
 ```bash
-npm start
+pnpm install
+pnpm run build
 ```
 
-Select "1. chat mode" and start telling your Agent to do things onchain!
+## Run the chatbot
+
+From `typescript/examples/vercel-ai-sdk-smart-wallet-chatbot`:
+
+```bash
+pnpm start
+```
+
+Choose chat mode to issue wallet and Twitter commands interactively.
+
+## Run the web chat page
+
+From `typescript/examples/vercel-ai-sdk-smart-wallet-chatbot`:
+
+```bash
+pnpm start:web
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+The browser UI uses the same agent logic as the terminal chatbot. It streams assistant text and shows tool calls in the page.
+
+## Run the Twitter worker
+
+From `typescript/examples/vercel-ai-sdk-smart-wallet-chatbot` in a separate terminal:
+
+```bash
+pnpm start:worker
+```
+
+The worker:
+
+- polls mentions every 15 seconds
+- logs each new mention
+- asks the agent to draft a reply
+- sends the reply with `replyToTweet`
+- stores processed mention IDs in `twitter_worker_state.json`
+
+## Expected behavior
+
+- `Post this tweet: GM world`
+  The agent calls `post_tweet` and prints the posted tweet payload.
+
+- `Check my mentions`
+  The agent calls `get_mentions` and returns the recent mention list.
+
+- `Reply to my latest mention`
+  The agent fetches mentions, selects the newest mention, and replies using `reply_to_tweet`.
 
 ## License
 
