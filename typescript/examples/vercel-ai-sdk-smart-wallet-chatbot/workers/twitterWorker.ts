@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { generateText } from "ai";
 import { createExampleAgent, formatToolOutput } from "../lib/agent";
+import { buildTwitterWorkerSkillsPrompt } from "../lib/skills";
 import {
   getMentions,
   replyToTweet,
@@ -95,7 +96,8 @@ async function generateReply(
 You are generating a reply to a Twitter mention for a background worker.
 Return only the reply text that should be posted. Do not wrap it in quotes.
 Do not mention tool names. Do not say that you are an AI assistant.
-Do not call Twitter posting tools yourself; the worker will send the reply after you draft it.`,
+Do not call Twitter posting tools yourself; the worker will send the reply after you draft it.
+${buildTwitterWorkerSkillsPrompt()}`,
     tools: agent.walletTools,
     stopWhen: agent.stopWhen,
     messages: [

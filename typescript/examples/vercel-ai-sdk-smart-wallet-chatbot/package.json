@@ -21,6 +21,7 @@
     "@ai-sdk/openai": "^3.0.0",
     "@coinbase/agentkit": "workspace:*",
     "ai": "^6.0.0",
+    "awal": "2.2.0",
     "dotenv": "^16.4.5",
     "twitter-api-v2": "^1.18.2",
     "tsx": "^4.7.1",

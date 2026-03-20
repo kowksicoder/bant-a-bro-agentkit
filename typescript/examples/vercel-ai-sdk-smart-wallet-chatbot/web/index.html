@@ -5,25 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bantzz Agent Console</title>
     <style>
-      @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+      @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap");
 
       :root {
-        --bg: #eceae4;
-        --surface: rgba(255, 255, 255, 0.8);
-        --surface-strong: #ffffff;
-        --surface-soft: rgba(255, 255, 255, 0.66);
-        --sidebar: rgba(249, 247, 242, 0.92);
-        --ink: #171513;
-        --muted: #6c655d;
-        --line: rgba(23, 21, 19, 0.09);
+        --bg: #f3f4f6;
+        --surface: #ffffff;
+        --surface-soft: #fafafa;
+        --surface-muted: #f7f7f8;
+        --sidebar: rgba(255, 255, 255, 0.88);
+        --ink: #161616;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --line-strong: #d7dbe2;
         --brand: #0f766e;
         --brand-soft: rgba(15, 118, 110, 0.1);
-        --brand-strong: #115e59;
-        --user: #111827;
-        --assistant: rgba(255, 255, 255, 0.6);
-        --tool: #fff4df;
+        --brand-ink: #0f5f59;
+        --assistant: #ffffff;
+        --user: #f3f4f6;
+        --tool: #f9fafb;
         --danger: #b91c1c;
-        --shadow: 0 20px 54px rgba(54, 36, 7, 0.08);
+        --shadow-lg: 0 20px 60px rgba(15, 23, 42, 0.08);
+        --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.04);
       }
 
       * {
@@ -37,27 +39,32 @@
       }
 
       body {
-        font-family: "IBM Plex Sans", sans-serif;
+        font-family: "Manrope", sans-serif;
         color: var(--ink);
         background:
-          radial-gradient(circle at top left, rgba(255, 255, 255, 0.72), transparent 26%),
-          linear-gradient(180deg, #f6f4ee 0%, var(--bg) 100%);
+          radial-gradient(circle at top left, rgba(15, 118, 110, 0.06), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(148, 163, 184, 0.08), transparent 20%),
+          var(--bg);
+      }
+
+      button,
+      textarea {
+        font: inherit;
       }
 
       .app {
-        width: min(1360px, calc(100vw - 18px));
-        margin: 9px auto;
-        min-height: calc(100vh - 18px);
+        min-height: 100vh;
         display: grid;
-        grid-template-columns: 268px minmax(0, 1fr);
+        grid-template-columns: 280px minmax(0, 1fr);
         gap: 12px;
+        padding: 12px;
       }
 
       .panel {
-        border: 1px solid var(--line);
-        border-radius: 22px;
-        box-shadow: var(--shadow);
-        backdrop-filter: blur(16px);
+        border: 1px solid rgba(229, 231, 235, 0.9);
+        border-radius: 26px;
+        box-shadow: var(--shadow-lg);
+        backdrop-filter: blur(14px);
       }
 
       .sidebar {
@@ -75,44 +82,52 @@
       }
 
       .brand-mark {
-        width: 34px;
-        height: 34px;
-        border-radius: 12px;
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
         display: grid;
         place-items: center;
-        background: linear-gradient(180deg, var(--brand), var(--brand-strong));
+        background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
         color: white;
-        font-weight: 600;
+        font-weight: 700;
       }
 
       .brand-copy strong {
         display: block;
-        font-size: 0.94rem;
+        font-size: 0.98rem;
+        letter-spacing: -0.01em;
       }
 
       .brand-copy span {
         display: block;
+        margin-top: 2px;
         font-size: 0.79rem;
         color: var(--muted);
       }
 
       .new-chat {
         width: 100%;
-        border: none;
+        border: 1px solid transparent;
         border-radius: 16px;
         padding: 12px 14px;
-        background: linear-gradient(180deg, var(--brand), var(--brand-strong));
+        background: #111827;
         color: white;
-        font: inherit;
         font-weight: 600;
         cursor: pointer;
+        transition: transform 120ms ease, opacity 120ms ease;
+      }
+
+      .new-chat:hover {
+        transform: translateY(-1px);
+        opacity: 0.96;
       }
 
       .section {
         padding: 12px;
         border: 1px solid var(--line);
         border-radius: 18px;
-        background: rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.82);
+        box-shadow: var(--shadow-sm);
       }
 
       .section-label {
@@ -132,10 +147,11 @@
 
       .history-item,
       .prompt-item {
-        padding: 10px 11px;
+        padding: 11px 12px;
         border-radius: 14px;
         border: 1px solid transparent;
-        background: rgba(255, 255, 255, 0.72);
+        background: var(--surface-muted);
+        text-align: left;
       }
 
       .history-item.active {
@@ -146,24 +162,27 @@
       .history-item strong,
       .prompt-item strong {
         display: block;
-        font-size: 0.87rem;
+        font-size: 0.86rem;
+        line-height: 1.35;
       }
 
       .history-item span,
       .prompt-item span {
         display: block;
-        margin-top: 2px;
-        font-size: 0.78rem;
+        margin-top: 4px;
+        font-size: 0.76rem;
         color: var(--muted);
-        line-height: 1.35;
+        line-height: 1.45;
       }
 
       .prompt-item {
         cursor: pointer;
+        border-color: var(--line);
       }
 
       .prompt-item:hover {
-        border-color: rgba(15, 118, 110, 0.14);
+        border-color: var(--line-strong);
+        background: #ffffff;
       }
 
       .sidebar-footer {
@@ -175,20 +194,21 @@
       .status-pill {
         border-radius: 999px;
         border: 1px solid var(--line);
-        padding: 8px 11px;
-        background: rgba(255, 255, 255, 0.74);
-        font-size: 0.8rem;
+        padding: 9px 11px;
+        background: rgba(255, 255, 255, 0.84);
+        font-size: 0.78rem;
+        color: var(--ink);
       }
 
       .status-pill.brand {
         background: var(--brand-soft);
-        color: var(--brand-strong);
+        color: var(--brand-ink);
         border-color: rgba(15, 118, 110, 0.18);
       }
 
       .main {
         min-width: 0;
-        background: var(--surface);
+        background: rgba(255, 255, 255, 0.82);
         display: grid;
         grid-template-rows: auto auto 1fr auto;
         overflow: hidden;
@@ -199,18 +219,20 @@
         justify-content: space-between;
         gap: 12px;
         align-items: center;
-        padding: 14px 16px 12px;
+        padding: 16px 20px 14px;
         border-bottom: 1px solid var(--line);
       }
 
       .main-title strong {
         display: block;
         font-size: 1rem;
+        letter-spacing: -0.02em;
       }
 
       .main-title span {
         display: block;
-        font-size: 0.82rem;
+        margin-top: 4px;
+        font-size: 0.8rem;
         color: var(--muted);
       }
 
@@ -225,23 +247,25 @@
         border-radius: 999px;
         border: 1px solid var(--line);
         padding: 7px 10px;
-        background: rgba(255, 255, 255, 0.72);
-        font-size: 0.8rem;
+        background: rgba(255, 255, 255, 0.9);
+        font-size: 0.78rem;
         white-space: nowrap;
       }
 
       .badge.brand {
         background: var(--brand-soft);
-        color: var(--brand-strong);
+        color: var(--brand-ink);
         border-color: rgba(15, 118, 110, 0.18);
       }
 
       .tool-strip {
         display: flex;
+        align-items: center;
         gap: 8px;
         overflow-x: auto;
-        padding: 10px 16px 12px;
+        padding: 10px 20px 12px;
         border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.72);
       }
 
       .tool-strip::-webkit-scrollbar {
@@ -254,23 +278,29 @@
         padding: 8px 11px;
         background: var(--tool);
         white-space: nowrap;
-        font-size: 0.8rem;
+        font-size: 0.77rem;
+        color: var(--muted);
+      }
+
+      .tool-chip.live {
+        color: var(--ink);
+        background: #ffffff;
       }
 
       .thread {
         min-height: 0;
         overflow-y: auto;
-        padding: 0 18px;
+        padding: 0 20px;
       }
 
       .thread-shell {
-        width: min(860px, 100%);
+        width: min(840px, 100%);
         margin: 0 auto;
-        padding: 20px 0 30px;
+        padding: 26px 0 30px;
       }
 
       .empty-state {
-        min-height: min(54vh, 560px);
+        min-height: min(58vh, 640px);
         display: grid;
         place-items: center;
       }
@@ -282,24 +312,36 @@
       .empty-card {
         width: min(720px, 100%);
         text-align: center;
-        padding: 34px 22px 24px;
+      }
+
+      .empty-mark {
+        width: 60px;
+        height: 60px;
+        margin: 0 auto 20px;
+        border-radius: 999px;
+        background:
+          radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.7), transparent 34%),
+          linear-gradient(135deg, #111827 0%, #0f766e 100%);
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.16);
       }
 
       .empty-card h1 {
         margin: 0;
-        font-size: clamp(2.2rem, 4vw, 3.5rem);
-        line-height: 1;
+        font-size: clamp(2rem, 4.2vw, 3.35rem);
+        line-height: 1.02;
+        letter-spacing: -0.05em;
       }
 
       .empty-card p {
         margin: 14px auto 0;
-        max-width: 560px;
+        max-width: 600px;
         color: var(--muted);
-        line-height: 1.55;
+        line-height: 1.6;
+        font-size: 0.98rem;
       }
 
       .suggest-grid {
-        margin-top: 28px;
+        margin-top: 26px;
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
@@ -308,29 +350,36 @@
       .suggest-card {
         border: 1px solid var(--line);
         border-radius: 18px;
-        background: var(--surface-soft);
+        background: rgba(255, 255, 255, 0.86);
         padding: 14px 15px;
         text-align: left;
         cursor: pointer;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .suggest-card:hover {
+        border-color: var(--line-strong);
+        background: #ffffff;
       }
 
       .suggest-card strong {
         display: block;
         font-size: 0.92rem;
+        line-height: 1.35;
       }
 
       .suggest-card span {
         display: block;
-        margin-top: 4px;
+        margin-top: 5px;
         font-size: 0.8rem;
         color: var(--muted);
-        line-height: 1.4;
+        line-height: 1.45;
       }
 
       .messages {
         display: none;
         flex-direction: column;
-        gap: 14px;
+        gap: 16px;
       }
 
       .messages.active {
@@ -338,70 +387,93 @@
       }
 
       .message {
-        max-width: min(760px, 92%);
+        width: 100%;
+        max-width: 100%;
+      }
+
+      .message-card {
+        max-width: 760px;
         border-radius: 18px;
         padding: 13px 15px;
-        border: 1px solid var(--line);
-        line-height: 1.55;
+        border: 1px solid transparent;
+        line-height: 1.65;
         white-space: pre-wrap;
-        background: var(--assistant);
+        background: transparent;
       }
 
       .message strong {
         display: block;
-        margin-bottom: 5px;
-        font-size: 0.72rem;
+        margin-bottom: 6px;
+        font-size: 0.71rem;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--muted);
       }
 
+      .message.assistant .message-card {
+        padding-left: 0;
+        padding-right: 0;
+      }
+
       .message.user {
-        align-self: flex-end;
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .message.user .message-card {
         background: var(--user);
-        color: white;
         border-color: transparent;
       }
 
-      .message.user strong {
-        color: rgba(255, 255, 255, 0.72);
+      .message.system .message-card {
+        background: var(--surface-soft);
+        border-color: var(--line);
       }
 
-      .message.system {
-        align-self: center;
-        width: 100%;
-        max-width: none;
+      .message.danger .message-card {
+        border-color: rgba(185, 28, 28, 0.2);
+        background: rgba(254, 242, 242, 0.9);
+      }
+
+      .message.danger strong,
+      .danger {
+        color: var(--danger);
       }
 
       .composer-wrap {
-        padding: 0 18px 18px;
+        padding: 0 20px 20px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.82) 26%);
       }
 
       .composer-shell {
-        width: min(860px, 100%);
+        width: min(840px, 100%);
         margin: 0 auto;
       }
 
       .composer {
-        border: 1px solid rgba(15, 118, 110, 0.1);
+        border: 1px solid var(--line);
         border-radius: 24px;
-        background: var(--surface-strong);
-        box-shadow: 0 10px 34px rgba(29, 17, 3, 0.06);
+        background: var(--surface);
+        box-shadow: 0 18px 34px rgba(15, 23, 42, 0.05);
         padding: 12px;
       }
 
       textarea {
         width: 100%;
         resize: none;
-        min-height: 82px;
-        max-height: 240px;
+        min-height: 28px;
+        max-height: 220px;
         border: none;
         background: transparent;
         outline: none;
-        font: inherit;
         font-size: 0.98rem;
         color: var(--ink);
-        padding: 4px 2px 8px;
+        line-height: 1.5;
+        padding: 4px 4px 10px;
+      }
+
+      textarea::placeholder {
+        color: #9ca3af;
       }
 
       .composer-meta {
@@ -409,7 +481,7 @@
         justify-content: space-between;
         align-items: center;
         gap: 12px;
-        padding-top: 8px;
+        padding-top: 10px;
         border-top: 1px solid var(--line);
       }
 
@@ -423,23 +495,22 @@
         border-radius: 999px;
         border: 1px solid var(--line);
         padding: 7px 10px;
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         color: var(--muted);
-        background: rgba(255, 255, 255, 0.78);
+        background: var(--surface-muted);
       }
 
       .send {
         border: none;
         border-radius: 999px;
-        width: 44px;
-        height: 44px;
+        width: 42px;
+        height: 42px;
         display: grid;
         place-items: center;
-        background: linear-gradient(180deg, var(--brand), var(--brand-strong));
+        background: #111827;
         color: white;
-        font: inherit;
-        font-size: 1.15rem;
-        font-weight: 600;
+        font-size: 1rem;
+        font-weight: 700;
         cursor: pointer;
       }
 
@@ -448,29 +519,40 @@
         opacity: 0.72;
       }
 
-      .danger {
-        color: var(--danger);
-      }
-
-      @media (max-width: 900px) {
+      @media (max-width: 980px) {
         .app {
-          width: min(100vw - 12px, 100%);
-          margin: 6px auto;
-          min-height: calc(100vh - 12px);
           grid-template-columns: 1fr;
+          padding: 8px;
         }
 
         .sidebar {
           display: none;
         }
 
+        .panel {
+          border-radius: 22px;
+        }
+
         .main-top {
           flex-direction: column;
           align-items: flex-start;
+          padding: 14px 16px 12px;
         }
 
         .top-actions {
           justify-content: flex-start;
+        }
+
+        .thread,
+        .composer-wrap,
+        .tool-strip {
+          padding-left: 14px;
+          padding-right: 14px;
+        }
+
+        .thread-shell,
+        .composer-shell {
+          width: 100%;
         }
 
         .suggest-grid {
@@ -485,7 +567,6 @@
         .send {
           width: 100%;
           border-radius: 14px;
-          height: 46px;
         }
       }
     </style>
@@ -496,8 +577,8 @@
         <div class="sidebar-top">
           <div class="brand-mark">B</div>
           <div class="brand-copy">
-            <strong>Bantzz Agent</strong>
-            <span>Wallet + Twitter</span>
+            <strong>Bantzz</strong>
+            <span>Wallet + social workspace</span>
           </div>
         </div>
 
@@ -514,23 +595,27 @@
         </section>
 
         <section class="section">
-          <span class="section-label">Starter prompts</span>
+          <span class="section-label">Start with</span>
           <div class="prompt-list">
-            <button class="prompt-item" type="button" data-prompt="What are my wallet details?">
-              <strong>Wallet details</strong>
-              <span>Inspect the current agent wallet and network.</span>
+            <button class="prompt-item" type="button" data-prompt="Show the smart wallet details">
+              <strong>Smart wallet details</strong>
+              <span>Inspect the built-in agent wallet and active network.</span>
+            </button>
+            <button class="prompt-item" type="button" data-prompt="Sign in to my wallet with me@example.com">
+              <strong>Sign in to my wallet</strong>
+              <span>Start the Agentic Wallet email OTP flow.</span>
+            </button>
+            <button class="prompt-item" type="button" data-prompt="Show my agentic wallet balance">
+              <strong>Show my wallet balance</strong>
+              <span>Check the authenticated Agentic Wallet balance.</span>
+            </button>
+            <button class="prompt-item" type="button" data-prompt="Help me fund my wallet">
+              <strong>Fund my wallet</strong>
+              <span>Open the Agentic Wallet funding flow and show the address.</span>
             </button>
             <button class="prompt-item" type="button" data-prompt="Check my mentions">
               <strong>Check mentions</strong>
               <span>Pull the latest X mentions for the bot account.</span>
-            </button>
-            <button class="prompt-item" type="button" data-prompt="Post this tweet: GM world">
-              <strong>Post tweet</strong>
-              <span>Use the Twitter tool from the browser UI.</span>
-            </button>
-            <button class="prompt-item" type="button" data-prompt="Reply to my latest mention">
-              <strong>Reply to latest mention</strong>
-              <span>Fetch recent mentions and reply in one turn.</span>
             </button>
           </div>
         </section>
@@ -544,44 +629,50 @@
       <section class="panel main">
         <header class="main-top">
           <div class="main-title">
-            <strong>Agent Conversation</strong>
-            <span>Chat-first browser shell attached to the current AgentKit runtime.</span>
+            <strong>Bantzz Agent</strong>
+            <span>Chat with the smart wallet, Agentic Wallet, and Twitter-capable runtime you already tested locally.</span>
           </div>
           <div class="top-actions">
             <span class="badge brand">Wallet ready</span>
-            <span class="badge">Twitter attached</span>
-            <span class="badge">Local web chat</span>
+            <span class="badge">Agentic wallet tools</span>
+            <span class="badge">Twitter tools</span>
+            <span class="badge">Local browser chat</span>
           </div>
         </header>
 
         <div class="tool-strip" id="toolFeed">
-          <span class="tool-chip">No tools called yet.</span>
+          <span class="tool-chip">Tool activity will appear here during a turn.</span>
         </div>
 
         <section class="thread" id="thread">
           <div class="thread-shell">
             <section class="empty-state" id="emptyState">
               <div class="empty-card">
-                <h1>How can Bantzz help today?</h1>
+                <div class="empty-mark"></div>
+                <h1>How can I help today?</h1>
                 <p>
-                  Start with wallet commands, Twitter actions, or a direct question. This uses the same live agent logic as the terminal and worker flows.
+                  Use Bantzz like a compact ChatGPT-style workspace. Start with a smart-wallet question, an Agentic Wallet sign-in flow, a Twitter action, or a direct instruction and the live agent will respond here.
                 </p>
                 <div class="suggest-grid">
-                  <button class="suggest-card" type="button" data-prompt="What are my wallet details?">
-                    <strong>Inspect the wallet</strong>
-                    <span>Show the agent wallet, owner, and network.</span>
+                  <button class="suggest-card" type="button" data-prompt="Show the smart wallet details">
+                    <strong>Inspect the smart wallet</strong>
+                    <span>Show the built-in agent wallet, ownership details, and network.</span>
                   </button>
-                  <button class="suggest-card" type="button" data-prompt="Check my mentions">
-                    <strong>Check Twitter mentions</strong>
-                    <span>Pull the current mention timeline for the bot account.</span>
+                  <button class="suggest-card" type="button" data-prompt="Sign in to my wallet with me@example.com">
+                    <strong>Start Agentic Wallet sign-in</strong>
+                    <span>Kick off email OTP authentication for a user wallet session.</span>
+                  </button>
+                  <button class="suggest-card" type="button" data-prompt="Show my agentic wallet balance">
+                    <strong>Check my Agentic Wallet balance</strong>
+                    <span>Use the authenticated wallet session to inspect balances.</span>
+                  </button>
+                  <button class="suggest-card" type="button" data-prompt="Help me fund my wallet">
+                    <strong>Fund my wallet</strong>
+                    <span>Open the funding flow and show the wallet address for deposits.</span>
                   </button>
                   <button class="suggest-card" type="button" data-prompt="Post this tweet: GM world">
                     <strong>Post a tweet</strong>
-                    <span>Trigger the tweet action from the browser UI.</span>
-                  </button>
-                  <button class="suggest-card" type="button" data-prompt="Reply to my latest mention">
-                    <strong>Reply to the latest mention</strong>
-                    <span>Fetch mentions and respond in one turn.</span>
+                    <span>Trigger the tweet action directly from this browser chat.</span>
                   </button>
                 </div>
               </div>
@@ -589,8 +680,10 @@
 
             <div class="messages" id="messages">
               <article class="message system">
-                <strong>System</strong>
-                Browser UI attached. Send a message to start a streamed chat turn.
+                <div class="message-card">
+                  <strong>System</strong>
+                  Browser UI attached. Send a message to start a streamed chat turn.
+                </div>
               </article>
             </div>
           </div>
@@ -605,9 +698,9 @@
                 <div class="composer-tools">
                   <span>Enter to send</span>
                   <span>Shift+Enter for newline</span>
-                  <span>Wallet + Twitter tools</span>
+                  <span>Smart wallet, Agentic Wallet, and Twitter tools</span>
                 </div>
-                <button class="send" id="sendButton" type="submit" aria-label="Send message">↑</button>
+                <button class="send" id="sendButton" type="submit" aria-label="Send message">&#8593;</button>
               </div>
             </form>
           </div>
@@ -633,6 +726,11 @@
       const messages = [];
       let pendingAssistant = null;
 
+      function autoResizeInput() {
+        promptInput.style.height = "auto";
+        promptInput.style.height = `${Math.min(promptInput.scrollHeight, 220)}px`;
+      }
+
       function syncEmptyState() {
         const hasConversation = messages.length > 0;
         emptyState.classList.toggle("hidden", hasConversation);
@@ -655,30 +753,42 @@
         const article = document.createElement("article");
         article.className = `message ${role}`;
 
+        const card = document.createElement("div");
+        card.className = "message-card";
+
         const label = document.createElement("strong");
         label.textContent = role === "user" ? "You" : role === "assistant" ? "Agent" : "System";
 
         const body = document.createElement("div");
         body.textContent = content;
 
-        article.append(label, body);
+        card.append(label, body);
+        article.appendChild(card);
         messagesContainer.appendChild(article);
         thread.scrollTop = thread.scrollHeight;
-        return body;
+        return { article, body };
       }
 
       function setBusy(busy) {
         sendButton.disabled = busy;
-        sendButton.textContent = busy ? "…" : "↑";
+        sendButton.innerHTML = busy ? "..." : "&#8593;";
       }
 
-      function resetToolFeed() {
+      function setToolPlaceholder(text) {
         toolFeed.innerHTML = "";
+        const chip = document.createElement("span");
+        chip.className = "tool-chip";
+        chip.textContent = text;
+        toolFeed.appendChild(chip);
       }
 
       function pushTool(toolName, output) {
+        if (toolFeed.children.length === 1 && toolFeed.firstElementChild.textContent.includes("appear here")) {
+          toolFeed.innerHTML = "";
+        }
+
         const chip = document.createElement("span");
-        chip.className = "tool-chip";
+        chip.className = "tool-chip live";
         chip.textContent = `${toolName}: ${output}`;
         toolFeed.appendChild(chip);
       }
@@ -687,16 +797,19 @@
         messages.length = 0;
         messagesContainer.innerHTML = `
           <article class="message system">
-            <strong>System</strong>
-            Browser UI attached. Send a message to start a streamed chat turn.
+            <div class="message-card">
+              <strong>System</strong>
+              Browser UI attached. Send a message to start a streamed chat turn.
+            </div>
           </article>
         `;
-        resetToolFeed();
-        toolFeed.innerHTML = '<span class="tool-chip">No tools called yet.</span>';
+        setToolPlaceholder("Tool activity will appear here during a turn.");
         statusText.textContent = "Waiting for first message.";
         twitterStatus.textContent = "Twitter status will appear after the first request.";
         syncEmptyState();
         updateHistory();
+        promptInput.value = "";
+        autoResizeInput();
       }
 
       async function sendMessage(prompt) {
@@ -711,7 +824,7 @@
         addMessage("user", trimmed);
         pendingAssistant = addMessage("assistant", "");
         statusText.textContent = "Streaming response...";
-        resetToolFeed();
+        setToolPlaceholder("Waiting for tool calls on this turn.");
         setBusy(true);
 
         try {
@@ -757,7 +870,7 @@
 
               if (event.type === "text-delta") {
                 assistantText += event.delta;
-                pendingAssistant.textContent = assistantText;
+                pendingAssistant.body.textContent = assistantText;
                 thread.scrollTop = thread.scrollHeight;
               }
 
@@ -766,27 +879,32 @@
               }
 
               if (event.type === "error") {
-                pendingAssistant.textContent = event.message;
-                pendingAssistant.parentElement.classList.add("danger");
+                pendingAssistant.body.textContent = event.message;
+                pendingAssistant.article.classList.add("danger");
                 statusText.textContent = "The request failed.";
               }
 
               if (event.type === "done") {
                 assistantText = event.text;
-                pendingAssistant.textContent = assistantText || "No response returned.";
+                pendingAssistant.body.textContent = assistantText || "No response returned.";
                 messages.push({ role: "assistant", content: assistantText });
                 statusText.textContent = "Turn complete.";
                 updateHistory();
+
+                if (toolFeed.children.length === 1 && toolFeed.firstElementChild.textContent.includes("Waiting for tool calls")) {
+                  setToolPlaceholder("No tools were used on this turn.");
+                }
               }
             }
           }
         } catch (error) {
-          pendingAssistant.textContent = error instanceof Error ? error.message : "Request failed";
-          pendingAssistant.parentElement.classList.add("danger");
+          pendingAssistant.body.textContent = error instanceof Error ? error.message : "Request failed";
+          pendingAssistant.article.classList.add("danger");
           statusText.textContent = "The request failed.";
         } finally {
           setBusy(false);
           pendingAssistant = null;
+          thread.scrollTop = thread.scrollHeight;
         }
       }
 
@@ -794,8 +912,11 @@
         event.preventDefault();
         const prompt = promptInput.value;
         promptInput.value = "";
+        autoResizeInput();
         await sendMessage(prompt);
       });
+
+      promptInput.addEventListener("input", autoResizeInput);
 
       promptInput.addEventListener("keydown", async event => {
         if (event.key === "Enter" && !event.shiftKey) {
@@ -803,6 +924,7 @@
           if (!sendButton.disabled) {
             const prompt = promptInput.value;
             promptInput.value = "";
+            autoResizeInput();
             await sendMessage(prompt);
           }
         }
@@ -816,12 +938,14 @@
       interactivePrompts.forEach(button => {
         button.addEventListener("click", () => {
           promptInput.value = button.getAttribute("data-prompt") || "";
+          autoResizeInput();
           promptInput.focus();
         });
       });
 
       syncEmptyState();
       updateHistory();
+      autoResizeInput();
     </script>
   </body>
 </html>

@@ -12,6 +12,22 @@ import { openai } from "@ai-sdk/openai";
 import { stepCountIs, tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { type Address } from "viem";
+import {
+  AGENTIC_WALLET_ASSETS,
+  AGENTIC_WALLET_CHAINS,
+  AGENTIC_WALLET_SEND_CHAINS,
+  fundAgenticWallet,
+  getAgenticWalletAddress,
+  getAgenticWalletBalance,
+  getAgenticWalletStatus,
+  loginAgenticWallet,
+  sendAgenticWalletUsdc,
+  showAgenticWallet,
+  tradeAgenticWallet,
+  verifyAgenticWallet,
+} from "./agenticWallet";
+import { buildProjectKnowledgePrompt } from "./knowledge";
+import { buildSkillsPrompt } from "./skills";
 import { getMentions, hasTwitterCredentials, postTweet, replyToTweet } from "./twitter";
 
 type WalletData = {
@@ -31,6 +47,7 @@ export type ExampleAgent = {
   stopWhen: ReturnType<typeof stepCountIs>;
   tools: ToolSet;
   walletTools: ToolSet;
+  agenticWalletTools: ToolSet;
   twitterEnabled: boolean;
 };
 
@@ -129,13 +146,13 @@ async function createExampleAgentInternal(): Promise<ExampleAgent> {
   );
 
   const walletTools = getExampleVercelAITools(agentKit);
+  const agenticWalletTools = createAgenticWalletTools();
   const twitterEnabled = hasTwitterCredentials();
-  const tools: ToolSet = twitterEnabled
-    ? {
-        ...walletTools,
-        ...createTwitterTools(),
-      }
-    : walletTools;
+  const tools: ToolSet = {
+    ...walletTools,
+    ...agenticWalletTools,
+    ...(twitterEnabled ? createTwitterTools() : {}),
+  };
 
   if (!twitterEnabled) {
     console.warn(
@@ -152,6 +169,7 @@ async function createExampleAgentInternal(): Promise<ExampleAgent> {
     stopWhen: stepCountIs(10),
     tools,
     walletTools,
+    agenticWalletTools,
     twitterEnabled,
   };
 }
@@ -243,6 +261,136 @@ function createTwitterTools(): ToolSet {
 }
 
 /**
+ * Create Agentic Wallet tools backed by the awal CLI.
+ *
+ * @returns Agentic wallet AI SDK tools
+ */
+function createAgenticWalletTools(): ToolSet {
+  return {
+    agentic_wallet_status: tool({
+      description:
+        "Check whether the local Agentic Wallet session is authenticated and ready. Use this before Agentic Wallet send or trade requests when wallet login state is unclear.",
+      inputSchema: z.object({}),
+      execute: async () => ({
+        success: true,
+        action: "agentic_wallet_status",
+        result: await getAgenticWalletStatus(),
+      }),
+    }),
+    agentic_wallet_auth_login: tool({
+      description:
+        "Start Agentic Wallet email OTP authentication for a user's own wallet. Use this when the user wants to create or sign in to their personal wallet.",
+      inputSchema: z.object({
+        email: z.string().email().describe("The email address to send the OTP to."),
+      }),
+      execute: async ({ email }) => ({
+        success: true,
+        action: "agentic_wallet_auth_login",
+        result: await loginAgenticWallet(email),
+      }),
+    }),
+    agentic_wallet_auth_verify: tool({
+      description:
+        "Complete Agentic Wallet email OTP verification using the flow ID and 6-digit OTP code.",
+      inputSchema: z.object({
+        flowId: z.string().min(1).describe("The flow ID returned by the login step."),
+        otp: z
+          .string()
+          .regex(/^\d{6}$/)
+          .describe("The 6-digit OTP code from the user's email."),
+      }),
+      execute: async ({ flowId, otp }) => ({
+        success: true,
+        action: "agentic_wallet_auth_verify",
+        result: await verifyAgenticWallet(flowId, otp),
+      }),
+    }),
+    agentic_wallet_address: tool({
+      description:
+        "Get the address for the currently authenticated Agentic Wallet session. Use this when the user asks for their own wallet address.",
+      inputSchema: z.object({
+        chain: z.enum(AGENTIC_WALLET_CHAINS).optional().describe("Optional chain selector."),
+      }),
+      execute: async ({ chain }) => ({
+        success: true,
+        action: "agentic_wallet_address",
+        result: await getAgenticWalletAddress(chain),
+      }),
+    }),
+    agentic_wallet_balance: tool({
+      description:
+        "Get balances for the authenticated Agentic Wallet. Supports optional chain and asset filters.",
+      inputSchema: z.object({
+        chain: z.enum(AGENTIC_WALLET_CHAINS).optional().describe("Optional chain selector."),
+        asset: z.enum(AGENTIC_WALLET_ASSETS).optional().describe("Optional asset selector."),
+      }),
+      execute: async ({ chain, asset }) => ({
+        success: true,
+        action: "agentic_wallet_balance",
+        result: await getAgenticWalletBalance({ chain, asset }),
+      }),
+    }),
+    agentic_wallet_fund: tool({
+      description:
+        "Open the Agentic Wallet funding flow and provide the wallet address for manual funding or onramp. Use this when the user wants to add money to their own wallet.",
+      inputSchema: z.object({}),
+      execute: async () => ({
+        success: true,
+        action: "agentic_wallet_fund",
+        result: await fundAgenticWallet(),
+      }),
+    }),
+    agentic_wallet_send_usdc: tool({
+      description:
+        "Send USDC from the authenticated Agentic Wallet to an address or ENS name. Use this only for requests involving the user's own wallet after confirming authentication.",
+      inputSchema: z.object({
+        amount: z.string().min(1).describe("The amount of USDC to send, such as 1 or 5.25."),
+        recipient: z.string().min(1).describe("The destination address or ENS name."),
+        chain: z
+          .enum(AGENTIC_WALLET_SEND_CHAINS)
+          .optional()
+          .describe("Optional supported chain. Defaults to base."),
+      }),
+      execute: async ({ amount, recipient, chain }) => ({
+        success: true,
+        action: "agentic_wallet_send_usdc",
+        result: await sendAgenticWalletUsdc(amount, recipient, chain),
+      }),
+    }),
+    agentic_wallet_trade: tool({
+      description:
+        "Trade tokens using the authenticated Agentic Wallet on Base. Use this for buy, swap, or trade requests from the user's own wallet.",
+      inputSchema: z.object({
+        amount: z
+          .string()
+          .min(1)
+          .describe("The amount string supported by awal, such as 5, 0.05, or $1."),
+        fromAsset: z
+          .string()
+          .min(1)
+          .describe("Source token symbol or contract address, for example usdc or eth."),
+        toAsset: z.string().min(1).describe("Destination token symbol or contract address."),
+      }),
+      execute: async ({ amount, fromAsset, toAsset }) => ({
+        success: true,
+        action: "agentic_wallet_trade",
+        result: await tradeAgenticWallet(amount, fromAsset, toAsset),
+      }),
+    }),
+    agentic_wallet_show_companion: tool({
+      description:
+        "Open or focus the local Agentic Wallet companion window. Use this when the user needs the wallet UI for funding or manual inspection.",
+      inputSchema: z.object({}),
+      execute: async () => ({
+        success: true,
+        action: "agentic_wallet_show_companion",
+        result: await showAgenticWallet(),
+      }),
+    }),
+  };
+}
+
+/**
  * Build the system prompt for the combined wallet and Twitter agent.
  *
  * @param options - Prompt configuration flags
@@ -254,6 +402,20 @@ function createSystemPrompt(options: { canUseFaucet: boolean; twitterEnabled: bo
   const faucetMessage = options.canUseFaucet
     ? "If you ever need funds, you can request them from the faucet."
     : "If you need funds, you can provide your wallet details and request funds from the user.";
+  const skillsMessage = buildSkillsPrompt();
+  const projectKnowledgeMessage = buildProjectKnowledgePrompt();
+
+  const agenticWalletMessage = `You also have Agentic Wallet tools for a user-authenticated wallet session.
+Use agentic_wallet_auth_login when the user wants to create or sign in to their own wallet with email.
+Use agentic_wallet_auth_verify when the user gives you the OTP code and flow ID.
+Use agentic_wallet_status whenever the Agentic Wallet login state is unclear before a user wallet action.
+Use agentic_wallet_address and agentic_wallet_balance for a user's own wallet details and balances.
+Use agentic_wallet_fund when the user wants to add money to their own wallet.
+Use agentic_wallet_send_usdc for "send" requests from the user's own authenticated wallet.
+Use agentic_wallet_trade for buy, trade, or swap requests from the user's own authenticated wallet.
+Use agentic_wallet_show_companion if the user needs the wallet companion window for funding or inspection.
+If the user is clearly asking about their personal wallet, prefer the Agentic Wallet tools over the smart-wallet tools.
+If Agentic Wallet authentication is missing, help the user sign in first before attempting send or trade actions.`;
 
   const twitterMessage = options.twitterEnabled
     ? `You can also manage Twitter (X) activity. Use post_tweet when the user wants to publish a tweet.
@@ -264,7 +426,10 @@ If the user says "Reply to my latest mention", call get_mentions first, choose t
 
   return `You are a helpful agent that can interact onchain using the Coinbase Developer Platform AgentKit.
 You are empowered to interact onchain using your tools. ${faucetMessage}
-Before executing your first onchain action, get the wallet details to see what network you're on.
+Before executing your first smart-wallet action, get the smart-wallet details to see what network you're on.
+${skillsMessage}
+${projectKnowledgeMessage}
+${agenticWalletMessage}
 ${twitterMessage}
 If there is a 5XX (internal) HTTP error code, ask the user to try again later.
 If someone asks you to do something you can't do with your currently available tools, you must say so, and
