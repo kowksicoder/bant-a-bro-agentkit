@@ -5,10 +5,14 @@
   "private": true,
   "author": "Coinbase Inc.",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "start": "tsx ./chatbot.ts",
     "start:web": "tsx ./web/server.ts",
     "start:worker": "tsx ./workers/twitterWorker.ts",
+    "start:railway": "node ./scripts/railway-start.mjs",
     "dev": "nodemon ./chatbot.ts",
     "dev:web": "nodemon ./web/server.ts",
     "dev:worker": "nodemon ./workers/twitterWorker.ts",

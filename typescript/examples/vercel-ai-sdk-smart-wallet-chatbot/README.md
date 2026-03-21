@@ -278,6 +278,67 @@ The worker:
 - sends the reply with `replyToTweet`
 - stores processed mention IDs and link state in the SQLite persistence store
 
+## Deploy on Railway
+
+This example is now wired so the same codebase can run as either:
+
+- a `web` service for Bant-A-Bro's HTTP/chat runtime
+- a `worker` service for the Twitter/X background worker
+
+Both services use the same `railway.json` and switch behavior with one env var:
+
+- `BANTABRO_SERVICE_ROLE=web`
+- `BANTABRO_SERVICE_ROLE=worker`
+
+Recommended Railway setup:
+
+1. Create a Railway service from this directory:
+   `typescript/examples/vercel-ai-sdk-smart-wallet-chatbot`
+2. For the web service, set:
+   - `BANTABRO_SERVICE_ROLE=web`
+   - `PORT` provided by Railway
+3. For the worker service, set:
+   - `BANTABRO_SERVICE_ROLE=worker`
+4. Use the same core env vars on both services:
+   - `OPENAI_API_KEY`
+   - `CDP_API_KEY_ID`
+   - `CDP_API_KEY_SECRET`
+   - `CDP_WALLET_SECRET`
+   - `BANTAH_OFFCHAIN_BASE_URL`
+   - `BANTAH_ONCHAIN_BASE_URL`
+   - `BANTAH_AGENT_TOKEN_SECRET`
+   - `BANTAH_AGENT_SERVICE_ID`
+   - `BANTAH_OFFCHAIN_AUDIENCE`
+   - `BANTAH_ONCHAIN_AUDIENCE`
+   - `BANTAH_AGENT_TOKEN_TTL_MS`
+   - `BANTAH_CHALLENGE_MODE`
+   - `BANT_A_BRO_WEB_URL`
+   - `BANTABRO_DB_PATH`
+5. Add Twitter credentials to the worker service:
+   - `TWITTER_API_KEY`
+   - `TWITTER_API_SECRET`
+   - `TWITTER_ACCESS_TOKEN`
+   - `TWITTER_ACCESS_TOKEN_SECRET`
+
+Recommended web-service extras:
+
+- `BANTABRO_FORCE_KNOWLEDGEBASE_MODE=false`
+- `BANTAH_ALLOW_DEV_CONTEXT_FALLBACK=false`
+- health check path: `/api/session`
+
+Recommended worker-service extras:
+
+- no public domain required
+- no health check path required
+
+The Railway entrypoint is:
+
+```bash
+npm run start:railway
+```
+
+It chooses `start:web` or `start:worker` automatically based on `BANTABRO_SERVICE_ROLE`.
+
 ## Expected behavior
 
 - `Post this tweet: GM world`
