@@ -1,801 +1,1299 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bant-A-Bro Agent Console</title>
-    <style>
-      @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap");
 
-      :root {
-        --bg: #f3f4f6;
-        --surface: #ffffff;
-        --surface-soft: #fafafa;
-        --surface-muted: #f7f7f8;
-        --sidebar: rgba(255, 255, 255, 0.88);
-        --ink: #161616;
-        --muted: #6b7280;
-        --line: #e5e7eb;
-        --line-strong: #d7dbe2;
-        --brand: #0f766e;
-        --brand-soft: rgba(15, 118, 110, 0.1);
-        --brand-ink: #0f5f59;
-        --assistant: #ffffff;
-        --user: #f3f4f6;
-        --tool: #f9fafb;
-        --danger: #b91c1c;
-        --shadow-lg: 0 20px 60px rgba(15, 23, 42, 0.08);
-        --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.04);
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bant-A-Bro Agent Console</title>
+  <link rel="icon" type="image/svg+xml" href="/bantzzlogo.svg" />
+  <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap");
+
+    @font-face {
+      font-family: "Poppins Rounded";
+      src: url("/PoppinsRounded-Rounded.ttf") format("truetype");
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+    }
+
+    :root {
+      --bg: #f5f4f0;
+      --surface: #fffefc;
+      --surface-soft: #f7f4ee;
+      --surface-muted: #f1ede5;
+      --sidebar: rgba(255, 255, 255, 0.78);
+      --ink: #161616;
+      --muted: #6b7280;
+      --line: #ebe5da;
+      --line-strong: #ddd2bf;
+      --brand: #0f766e;
+      --brand-soft: rgba(15, 118, 110, 0.08);
+      --brand-ink: #0f5f59;
+      --assistant: #ffffff;
+      --user: #eaf6f4;
+      --tool: #f7f4ee;
+      --danger: #b91c1c;
+      --shadow-lg: 0 10px 30px rgba(15, 23, 42, 0.04);
+      --shadow-sm: 0 3px 10px rgba(15, 23, 42, 0.025);
+      --page-glow-a: rgba(122, 162, 255, 0.08);
+      --page-glow-b: rgba(255, 208, 226, 0.08);
+      --logo-glow: drop-shadow(0 14px 28px rgba(144, 164, 174, 0.18));
+      --assistant-gradient:
+        linear-gradient(135deg, rgba(255, 246, 247, 0.86), rgba(244, 248, 255, 0.86));
+      --control-bg: #111827;
+      --control-ink: #ffffff;
+    }
+
+    [data-theme="dark"] {
+      --bg: #050505;
+      --surface: rgba(9, 9, 9, 0.96);
+      --surface-soft: rgba(14, 14, 14, 0.96);
+      --surface-muted: rgba(19, 19, 19, 0.96);
+      --sidebar: rgba(8, 8, 8, 0.82);
+      --ink: #f5f5f5;
+      --muted: #9a9a9a;
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.16);
+      --brand: #9fd6ff;
+      --brand-soft: rgba(159, 214, 255, 0.1);
+      --brand-ink: #d9f1ff;
+      --assistant: rgba(10, 10, 10, 0.96);
+      --user: rgba(11, 44, 49, 0.88);
+      --tool: rgba(16, 16, 16, 0.94);
+      --danger: #ff7b7b;
+      --shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.36);
+      --shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.24);
+      --page-glow-a: rgba(98, 147, 255, 0.08);
+      --page-glow-b: rgba(228, 124, 255, 0.06);
+      --logo-glow: drop-shadow(0 14px 24px rgba(144, 164, 174, 0.18));
+      --assistant-gradient: rgba(16, 16, 16, 0.96);
+      --control-bg: #f5f5f5;
+      --control-ink: #050505;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: light;
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      min-height: 100dvh;
+      font-family: "Poppins Rounded", "Manrope", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, var(--page-glow-a), transparent 26%),
+        radial-gradient(circle at bottom right, var(--page-glow-b), transparent 20%),
+        var(--bg);
+      transition:
+        background-color 180ms ease,
+        color 180ms ease;
+    }
+
+    body.drawer-open {
+      overflow: hidden;
+    }
+
+    button,
+    textarea {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100dvh;
+      display: grid;
+      grid-template-columns: 210px minmax(0, 1fr);
+      gap: 18px;
+      width: min(1340px, 100%);
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .sidebar {
+      background: var(--sidebar);
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 18px;
+      padding: 18px 16px;
+      backdrop-filter: blur(18px);
+    }
+
+    .sidebar-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--line);
+    }
+
+    .brand-mark img {
+      width: 28px;
+      height: 28px;
+      display: block;
+      filter: var(--logo-glow);
+    }
+
+    [data-theme="dark"] .brand-mark,
+    [data-theme="dark"] .empty-mark {
+      background: rgba(16, 16, 16, 0.96);
+    }
+
+    .brand-copy strong {
+      display: block;
+      font-size: 0.9rem;
+      letter-spacing: -0.01em;
+    }
+
+    .brand-copy {
+      min-width: 0;
+    }
+
+    .brand-copy span {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .new-chat {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 12px;
+      background: var(--control-bg);
+      color: var(--control-ink);
+      font-weight: 600;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: transform 120ms ease, opacity 120ms ease;
+    }
+
+    .new-chat:hover {
+      transform: translateY(-1px);
+      opacity: 0.96;
+    }
+
+    .section {
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .section-label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 0.66rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .history-list,
+    .prompt-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .history-item,
+    .prompt-item {
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.7);
+      text-align: left;
+    }
+
+    .history-item.active {
+      border-color: rgba(15, 118, 110, 0.14);
+      background: var(--brand-soft);
+    }
+
+    .history-item strong,
+    .prompt-item strong {
+      display: block;
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .history-item span,
+    .prompt-item span {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.71rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .prompt-item {
+      cursor: pointer;
+    }
+
+    .prompt-item:hover {
+      border-color: var(--line-strong);
+      background: #ffffff;
+    }
+
+    .sidebar-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .status-pill {
+      border-radius: 0;
+      border: none;
+      padding: 0;
+      background: transparent;
+      font-size: 0.72rem;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    .status-pill.brand {
+      background: transparent;
+      color: var(--brand-ink);
+    }
+
+    .main {
+      min-width: 0;
+      min-height: 0;
+      background: var(--surface);
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .main-top {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      align-items: center;
+      padding: 20px 24px 8px;
+      border-bottom: none;
+    }
+
+    .main-title strong {
+      display: block;
+      font-size: 0.92rem;
+      letter-spacing: -0.02em;
+    }
+
+    .main-title span {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.73rem;
+      color: var(--muted);
+    }
+
+    .top-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .menu-toggle,
+    .drawer-close {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--ink);
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      font: inherit;
+      cursor: pointer;
+      place-items: center;
+    }
+
+    [data-theme="dark"] .menu-toggle,
+    [data-theme="dark"] .drawer-close {
+      background: rgba(16, 16, 16, 0.96);
+    }
+
+    .menu-toggle svg,
+    .drawer-close svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .drawer-close {
+      margin-left: auto;
+    }
+
+    .badge {
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 6px 9px;
+      background: rgba(255, 255, 255, 0.75);
+      font-size: 0.69rem;
+      white-space: nowrap;
+    }
+
+    .badge.brand {
+      background: var(--brand-soft);
+      color: var(--brand-ink);
+      border-color: rgba(15, 118, 110, 0.18);
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--ink);
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      font: inherit;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+
+    [data-theme="dark"] .theme-toggle {
+      background: rgba(16, 16, 16, 0.96);
+    }
+
+    .theme-toggle svg {
+      width: 17px;
+      height: 17px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .theme-toggle .icon-sun {
+      display: none;
+    }
+
+    [data-theme="dark"] .theme-toggle .icon-moon {
+      display: none;
+    }
+
+    [data-theme="dark"] .theme-toggle .icon-sun {
+      display: block;
+    }
+
+    .tool-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 0 24px 8px;
+      border-bottom: none;
+      background: transparent;
+    }
+
+    .tool-strip::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .tool-strip.hidden {
+      display: none;
+    }
+
+    .sidebar-scrim {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 6, 6, 0.38);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+      z-index: 39;
+      border: 0;
+      padding: 0;
+    }
+
+    .sidebar-scrim.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .tool-chip {
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      background: var(--tool);
+      white-space: nowrap;
+      font-size: 0.7rem;
+      color: var(--muted);
+      flex: 0 0 auto;
+      max-width: min(320px, 78vw);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tool-chip.live {
+      color: var(--ink);
+      background: var(--surface-soft);
+    }
+
+    .thread {
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+      padding: 0 24px;
+    }
+
+    .thread-shell {
+      width: min(720px, 100%);
+      margin: 0 auto;
+      padding: 18px 0 18px;
+    }
+
+    .empty-state {
+      min-height: min(54vh, 560px);
+      display: grid;
+      place-items: center;
+    }
+
+    .empty-state.hidden {
+      display: none;
+    }
+
+    .empty-card {
+      width: min(680px, 100%);
+      text-align: center;
+    }
+
+    .empty-mark {
+      width: 46px;
+      height: 46px;
+      margin: 0 auto 16px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid var(--line);
+    }
+
+    .empty-mark img {
+      width: 28px;
+      height: 28px;
+      display: block;
+      filter: var(--logo-glow);
+    }
+
+    .empty-card h1 {
+      margin: 0;
+      font-size: clamp(2.1rem, 3vw, 3rem);
+      line-height: 1.05;
+      letter-spacing: -0.045em;
+      font-weight: 600;
+    }
+
+    .hero-title-line,
+    .hero-rotator {
+      display: block;
+      background: linear-gradient(135deg, #97c2ff 0%, #9cc1ff 36%, #f0b3ff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-rotator {
+      min-height: 1.12em;
+      transition:
+        opacity 180ms ease,
+        transform 180ms ease;
+    }
+
+    .hero-rotator.is-swapping {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    .empty-card p {
+      margin: 12px auto 0;
+      max-width: 420px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 0.86rem;
+    }
+
+    .suggest-grid {
+      margin-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .suggest-card {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(238, 246, 255, 0.7);
+      padding: 10px 14px;
+      text-align: left;
+      cursor: pointer;
+      min-height: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .suggest-card:hover {
+      border-color: var(--line-strong);
+      background: #ffffff;
+    }
+
+    [data-theme="dark"] .suggest-card {
+      background: rgba(18, 18, 18, 0.96);
+    }
+
+    [data-theme="dark"] .suggest-card:hover {
+      background: rgba(24, 24, 24, 0.98);
+    }
+
+    [data-theme="dark"] .suggest-icon {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .suggest-card strong {
+      display: block;
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .suggest-icon {
+      width: 30px;
+      height: 30px;
+      flex: 0 0 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.45);
+    }
+
+    .suggest-icon iconify-icon {
+      width: 18px;
+      height: 18px;
+      color: var(--brand);
+      animation: suggestIconFloat 2.8s ease-in-out infinite;
+    }
+
+    .suggest-copy {
+      min-width: 0;
+      display: block;
+    }
+
+    @keyframes suggestIconFloat {
+
+      0%,
+      100% {
+        transform: translateY(0px) scale(1);
       }
 
-      * {
-        box-sizing: border-box;
+      50% {
+        transform: translateY(-1.5px) scale(1.04);
       }
+    }
 
-      html,
-      body {
-        margin: 0;
-        min-height: 100%;
-      }
+    .suggest-copy>span {
+      display: none;
+      margin-top: 5px;
+      font-size: 0.74rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
 
-      body {
-        font-family: "Manrope", sans-serif;
-        color: var(--ink);
-        background:
-          radial-gradient(circle at top left, rgba(15, 118, 110, 0.06), transparent 24%),
-          radial-gradient(circle at bottom right, rgba(148, 163, 184, 0.08), transparent 20%),
-          var(--bg);
-      }
+    .messages {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
 
-      button,
-      textarea {
-        font: inherit;
-      }
+    .messages.active {
+      display: flex;
+    }
 
+    .message {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .message-card {
+      max-width: 620px;
+      border-radius: 22px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      line-height: 1.58;
+      white-space: pre-wrap;
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .message strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .message:not(.system) strong {
+      display: none;
+    }
+
+    .message.assistant .message-card {
+      background: var(--assistant-gradient);
+    }
+
+    .message.user {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .message.user .message-card {
+      background: var(--user);
+      border-color: transparent;
+      max-width: min(620px, 82%);
+    }
+
+    .message.system .message-card {
+      display: none;
+    }
+
+    .message.danger .message-card {
+      border-color: rgba(185, 28, 28, 0.2);
+      background: rgba(254, 242, 242, 0.9);
+    }
+
+    .message.danger strong,
+    .danger {
+      color: var(--danger);
+    }
+
+    .composer-wrap {
+      padding: 0 24px 24px;
+      background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, var(--surface) 38%);
+    }
+
+    .composer-shell {
+      width: min(720px, 100%);
+      margin: 0 auto;
+    }
+
+    .composer {
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+      padding: 10px 12px;
+    }
+
+    [data-theme="dark"] .main,
+    [data-theme="dark"] .composer,
+    [data-theme="dark"] .message-card,
+    [data-theme="dark"] .history-item,
+    [data-theme="dark"] .prompt-item,
+    [data-theme="dark"] .badge {
+      background-color: var(--surface-soft);
+    }
+
+    [data-theme="dark"] .message.user .message-card {
+      background: var(--user);
+    }
+
+    [data-theme="dark"] .message.assistant .message-card {
+      background: var(--assistant-gradient);
+    }
+
+    textarea {
+      width: 100%;
+      resize: none;
+      min-height: 28px;
+      max-height: 220px;
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 0.96rem;
+      color: var(--ink);
+      line-height: 1.5;
+      padding: 6px 4px 8px;
+    }
+
+    textarea::placeholder {
+      color: #9ca3af;
+    }
+
+    .composer-meta {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      padding-top: 4px;
+      border-top: none;
+    }
+
+    .send {
+      border: none;
+      border-radius: 999px;
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      background: var(--control-bg);
+      color: var(--control-ink);
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .send:disabled {
+      cursor: wait;
+      opacity: 0.72;
+    }
+
+    @media (max-width: 980px) {
       .app {
-        min-height: 100vh;
-        display: grid;
-        grid-template-columns: 280px minmax(0, 1fr);
-        gap: 12px;
-        padding: 12px;
-      }
-
-      .panel {
-        border: 1px solid rgba(229, 231, 235, 0.9);
-        border-radius: 26px;
-        box-shadow: var(--shadow-lg);
-        backdrop-filter: blur(14px);
+        grid-template-columns: 1fr;
+        padding: 8px;
+        gap: 0;
       }
 
       .sidebar {
-        background: var(--sidebar);
-        display: grid;
-        grid-template-rows: auto auto auto 1fr auto;
-        gap: 12px;
-        padding: 14px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(320px, 88vw);
+        padding:
+          max(18px, calc(env(safe-area-inset-top, 0px) + 12px)) 16px max(18px, calc(env(safe-area-inset-bottom, 0px) + 12px));
+        gap: 18px;
+        transform: translateX(calc(-100% - 20px));
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          transform 180ms ease,
+          opacity 180ms ease;
+        z-index: 40;
+        border-radius: 0 24px 24px 0;
+        border-left: none;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+        overflow-y: auto;
+      }
+
+      .sidebar.is-open {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
       }
 
       .sidebar-top {
-        display: flex;
+        justify-content: space-between;
         align-items: center;
-        gap: 10px;
-      }
-
-      .brand-mark {
-        width: 38px;
-        height: 38px;
-        border-radius: 14px;
-        display: grid;
-        place-items: center;
-        background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
-        color: white;
-        font-weight: 700;
-      }
-
-      .brand-copy strong {
-        display: block;
-        font-size: 0.98rem;
-        letter-spacing: -0.01em;
-      }
-
-      .brand-copy span {
-        display: block;
-        margin-top: 2px;
-        font-size: 0.79rem;
-        color: var(--muted);
       }
 
       .new-chat {
         width: 100%;
-        border: 1px solid transparent;
-        border-radius: 16px;
-        padding: 12px 14px;
-        background: #111827;
-        color: white;
-        font-weight: 600;
-        cursor: pointer;
-        transition: transform 120ms ease, opacity 120ms ease;
-      }
-
-      .new-chat:hover {
-        transform: translateY(-1px);
-        opacity: 0.96;
       }
 
       .section {
-        padding: 12px;
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.82);
-        box-shadow: var(--shadow-sm);
-      }
-
-      .section-label {
         display: block;
-        margin-bottom: 10px;
-        font-size: 0.72rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--muted);
-      }
-
-      .history-list,
-      .prompt-list {
-        display: grid;
-        gap: 8px;
-      }
-
-      .history-item,
-      .prompt-item {
-        padding: 11px 12px;
-        border-radius: 14px;
-        border: 1px solid transparent;
-        background: var(--surface-muted);
-        text-align: left;
-      }
-
-      .history-item.active {
-        border-color: rgba(15, 118, 110, 0.16);
-        background: var(--brand-soft);
-      }
-
-      .history-item strong,
-      .prompt-item strong {
-        display: block;
-        font-size: 0.86rem;
-        line-height: 1.35;
-      }
-
-      .history-item span,
-      .prompt-item span {
-        display: block;
-        margin-top: 4px;
-        font-size: 0.76rem;
-        color: var(--muted);
-        line-height: 1.45;
-      }
-
-      .prompt-item {
-        cursor: pointer;
-        border-color: var(--line);
-      }
-
-      .prompt-item:hover {
-        border-color: var(--line-strong);
-        background: #ffffff;
       }
 
       .sidebar-footer {
-        display: flex;
         flex-direction: column;
-        gap: 8px;
+        flex-wrap: nowrap;
+        align-items: flex-start;
       }
 
-      .status-pill {
-        border-radius: 999px;
-        border: 1px solid var(--line);
-        padding: 9px 11px;
-        background: rgba(255, 255, 255, 0.84);
-        font-size: 0.78rem;
-        color: var(--ink);
-      }
-
-      .status-pill.brand {
-        background: var(--brand-soft);
-        color: var(--brand-ink);
-        border-color: rgba(15, 118, 110, 0.18);
-      }
-
-      .main {
-        min-width: 0;
-        background: rgba(255, 255, 255, 0.82);
-        display: grid;
-        grid-template-rows: auto auto 1fr auto;
-        overflow: hidden;
+      .panel {
+        border-radius: 24px;
       }
 
       .main-top {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
+        flex-direction: row;
         align-items: center;
-        padding: 16px 20px 14px;
-        border-bottom: 1px solid var(--line);
-      }
-
-      .main-title strong {
-        display: block;
-        font-size: 1rem;
-        letter-spacing: -0.02em;
-      }
-
-      .main-title span {
-        display: block;
-        margin-top: 4px;
-        font-size: 0.8rem;
-        color: var(--muted);
+        padding: 16px 16px 8px;
       }
 
       .top-actions {
-        display: flex;
-        flex-wrap: wrap;
         justify-content: flex-end;
-        gap: 8px;
+        margin-left: auto;
       }
 
-      .badge {
-        border-radius: 999px;
-        border: 1px solid var(--line);
-        padding: 7px 10px;
-        background: rgba(255, 255, 255, 0.9);
-        font-size: 0.78rem;
-        white-space: nowrap;
+      .menu-toggle,
+      .drawer-close {
+        display: grid;
       }
 
-      .badge.brand {
-        background: var(--brand-soft);
-        color: var(--brand-ink);
-        border-color: rgba(15, 118, 110, 0.18);
-      }
-
+      .thread,
+      .composer-wrap,
       .tool-strip {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 10px 20px 12px;
-        border-bottom: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.72);
-      }
-
-      .tool-strip::-webkit-scrollbar {
-        height: 6px;
-      }
-
-      .tool-chip {
-        border-radius: 999px;
-        border: 1px solid var(--line);
-        padding: 8px 11px;
-        background: var(--tool);
-        white-space: nowrap;
-        font-size: 0.77rem;
-        color: var(--muted);
-      }
-
-      .tool-chip.live {
-        color: var(--ink);
-        background: #ffffff;
-      }
-
-      .thread {
-        min-height: 0;
-        overflow-y: auto;
-        padding: 0 20px;
-      }
-
-      .thread-shell {
-        width: min(840px, 100%);
-        margin: 0 auto;
-        padding: 26px 0 30px;
-      }
-
-      .empty-state {
-        min-height: min(58vh, 640px);
-        display: grid;
-        place-items: center;
-      }
-
-      .empty-state.hidden {
-        display: none;
-      }
-
-      .empty-card {
-        width: min(720px, 100%);
-        text-align: center;
-      }
-
-      .empty-mark {
-        width: 60px;
-        height: 60px;
-        margin: 0 auto 20px;
-        border-radius: 999px;
-        background:
-          radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.7), transparent 34%),
-          linear-gradient(135deg, #111827 0%, #0f766e 100%);
-        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.16);
-      }
-
-      .empty-card h1 {
-        margin: 0;
-        font-size: clamp(2rem, 4.2vw, 3.35rem);
-        line-height: 1.02;
-        letter-spacing: -0.05em;
-      }
-
-      .empty-card p {
-        margin: 14px auto 0;
-        max-width: 600px;
-        color: var(--muted);
-        line-height: 1.6;
-        font-size: 0.98rem;
-      }
-
-      .suggest-grid {
-        margin-top: 26px;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-      }
-
-      .suggest-card {
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.86);
-        padding: 14px 15px;
-        text-align: left;
-        cursor: pointer;
-        box-shadow: var(--shadow-sm);
-      }
-
-      .suggest-card:hover {
-        border-color: var(--line-strong);
-        background: #ffffff;
-      }
-
-      .suggest-card strong {
-        display: block;
-        font-size: 0.92rem;
-        line-height: 1.35;
-      }
-
-      .suggest-card span {
-        display: block;
-        margin-top: 5px;
-        font-size: 0.8rem;
-        color: var(--muted);
-        line-height: 1.45;
-      }
-
-      .messages {
-        display: none;
-        flex-direction: column;
-        gap: 16px;
-      }
-
-      .messages.active {
-        display: flex;
-      }
-
-      .message {
-        width: 100%;
-        max-width: 100%;
-      }
-
-      .message-card {
-        max-width: 760px;
-        border-radius: 18px;
-        padding: 13px 15px;
-        border: 1px solid transparent;
-        line-height: 1.65;
-        white-space: pre-wrap;
-        background: transparent;
-      }
-
-      .message strong {
-        display: block;
-        margin-bottom: 6px;
-        font-size: 0.71rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--muted);
-      }
-
-      .message.assistant .message-card {
-        padding-left: 0;
-        padding-right: 0;
-      }
-
-      .message.user {
-        display: flex;
-        justify-content: flex-end;
-      }
-
-      .message.user .message-card {
-        background: var(--user);
-        border-color: transparent;
-      }
-
-      .message.system .message-card {
-        background: var(--surface-soft);
-        border-color: var(--line);
-      }
-
-      .message.danger .message-card {
-        border-color: rgba(185, 28, 28, 0.2);
-        background: rgba(254, 242, 242, 0.9);
-      }
-
-      .message.danger strong,
-      .danger {
-        color: var(--danger);
+        padding-left: 16px;
+        padding-right: 16px;
       }
 
       .composer-wrap {
-        padding: 0 20px 20px;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.82) 26%);
+        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
       }
 
+      .thread-shell,
       .composer-shell {
-        width: min(840px, 100%);
-        margin: 0 auto;
-      }
-
-      .composer {
-        border: 1px solid var(--line);
-        border-radius: 24px;
-        background: var(--surface);
-        box-shadow: 0 18px 34px rgba(15, 23, 42, 0.05);
-        padding: 12px;
-      }
-
-      textarea {
         width: 100%;
-        resize: none;
-        min-height: 28px;
-        max-height: 220px;
-        border: none;
-        background: transparent;
-        outline: none;
-        font-size: 0.98rem;
-        color: var(--ink);
-        line-height: 1.5;
-        padding: 4px 4px 10px;
       }
 
-      textarea::placeholder {
-        color: #9ca3af;
+      .suggest-grid {
+        justify-content: flex-start;
       }
 
       .composer-meta {
-        display: flex;
-        justify-content: space-between;
         align-items: center;
-        gap: 12px;
-        padding-top: 10px;
-        border-top: 1px solid var(--line);
-      }
-
-      .composer-tools {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .composer-tools span {
-        border-radius: 999px;
-        border: 1px solid var(--line);
-        padding: 7px 10px;
-        font-size: 0.76rem;
-        color: var(--muted);
-        background: var(--surface-muted);
       }
 
       .send {
-        border: none;
+        width: 40px;
         border-radius: 999px;
-        width: 42px;
-        height: 42px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        padding: 0;
+      }
+
+      .menu-toggle,
+      .theme-toggle,
+      .drawer-close {
+        width: 36px;
+        height: 36px;
+      }
+
+      .main-title span {
+        max-width: 26ch;
+      }
+
+      .top-actions .badge:nth-child(n + 2) {
+        display: none;
+      }
+
+      .empty-state {
+        min-height: auto;
+      }
+
+      .thread-shell {
+        padding-top: 10px;
+      }
+
+      .empty-card h1 {
+        font-size: 1.95rem;
+      }
+
+      .empty-card p {
+        font-size: 0.86rem;
+      }
+
+      .tool-chip {
+        max-width: min(220px, 70vw);
+      }
+
+      .suggest-card {
+        width: 100%;
+        justify-content: flex-start;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 10px 12px;
+      }
+
+      .suggest-grid {
         display: grid;
-        place-items: center;
-        background: #111827;
-        color: white;
-        font-size: 1rem;
-        font-weight: 700;
-        cursor: pointer;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        align-items: stretch;
       }
 
-      .send:disabled {
-        cursor: wait;
-        opacity: 0.72;
+      .suggest-icon {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.9);
+        border-color: rgba(255, 255, 255, 0.55);
       }
 
-      @media (max-width: 980px) {
-        .app {
-          grid-template-columns: 1fr;
-          padding: 8px;
-        }
-
-        .sidebar {
-          display: none;
-        }
-
-        .panel {
-          border-radius: 22px;
-        }
-
-        .main-top {
-          flex-direction: column;
-          align-items: flex-start;
-          padding: 14px 16px 12px;
-        }
-
-        .top-actions {
-          justify-content: flex-start;
-        }
-
-        .thread,
-        .composer-wrap,
-        .tool-strip {
-          padding-left: 14px;
-          padding-right: 14px;
-        }
-
-        .thread-shell,
-        .composer-shell {
-          width: 100%;
-        }
-
-        .suggest-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .composer-meta {
-          flex-direction: column;
-          align-items: stretch;
-        }
-
-        .send {
-          width: 100%;
-          border-radius: 14px;
-        }
+      [data-theme="dark"] .suggest-icon {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.08);
       }
-    </style>
-  </head>
-  <body>
-    <main class="app">
-      <aside class="panel sidebar">
-        <div class="sidebar-top">
-          <div class="brand-mark">B</div>
+
+      .suggest-copy {
+        display: flex;
+        align-items: center;
+      }
+
+      .suggest-copy>span {
+        display: none;
+      }
+
+      .suggest-card strong {
+        margin: 0;
+        font-size: 0.74rem;
+        line-height: 1.2;
+      }
+
+      .sidebar {
+        width: min(300px, 86vw);
+        border-radius: 0 22px 22px 0;
+        border-right: 1px solid var(--line);
+      }
+
+      .main {
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <aside class="panel sidebar" id="sidebarDrawer">
+      <div class="sidebar-top">
+        <div class="sidebar-brand">
+          <div class="brand-mark">
+            <img src="/bantzzlogo.svg" alt="Bant-A-Bro logo" />
+          </div>
           <div class="brand-copy">
             <strong>Bant-A-Bro</strong>
-            <span>Wallet + social workspace</span>
+            <span>Wallet and social chat</span>
           </div>
         </div>
+        <button class="drawer-close" id="drawerClose" type="button" aria-label="Close navigation">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
 
-        <button class="new-chat" id="newChatButton" type="button">+ New chat</button>
+      <button class="new-chat" id="newChatButton" type="button">+ New chat</button>
 
-        <section class="section">
-          <span class="section-label">Current thread</span>
-          <div class="history-list">
-            <div class="history-item active">
-              <strong id="historyTitle">Fresh session</strong>
-              <span id="historyMeta">No messages yet.</span>
-            </div>
+      <section class="section">
+        <span class="section-label">HISTORY</span>
+        <div class="history-list">
+          <div class="history-item active">
+            <strong id="historyTitle"></strong>
+            <span id="historyMeta">No messages yet.</span>
           </div>
-        </section>
-
-        <section class="section">
-          <span class="section-label">Start with</span>
-          <div class="prompt-list">
-            <button class="prompt-item" type="button" data-prompt="Show the smart wallet details">
-              <strong>Smart wallet details</strong>
-              <span>Inspect the built-in agent wallet and active network.</span>
-            </button>
-            <button class="prompt-item" type="button" data-prompt="Sign in to my wallet with me@example.com">
-              <strong>Sign in to my wallet</strong>
-              <span>Start the Agentic Wallet email OTP flow.</span>
-            </button>
-            <button class="prompt-item" type="button" data-prompt="Show my agentic wallet balance">
-              <strong>Show my wallet balance</strong>
-              <span>Check the authenticated Agentic Wallet balance.</span>
-            </button>
-            <button class="prompt-item" type="button" data-prompt="Help me fund my wallet">
-              <strong>Fund my wallet</strong>
-              <span>Open the Agentic Wallet funding flow and show the address.</span>
-            </button>
-            <button class="prompt-item" type="button" data-prompt="Check my mentions">
-              <strong>Check mentions</strong>
-              <span>Pull the latest X mentions for the bot account.</span>
-            </button>
-          </div>
-        </section>
-
-        <div class="sidebar-footer">
-          <span class="status-pill brand" id="statusText">Waiting for first message.</span>
-          <span class="status-pill" id="twitterStatus">Twitter status will appear after the first request.</span>
         </div>
-      </aside>
-
-      <section class="panel main">
-        <header class="main-top">
-          <div class="main-title">
-            <strong>Bant-A-Bro Agent</strong>
-            <span>Chat with the smart wallet, Agentic Wallet, and Twitter-capable runtime you already tested locally.</span>
-          </div>
-          <div class="top-actions">
-            <span class="badge brand">Wallet ready</span>
-            <span class="badge">Agentic wallet tools</span>
-            <span class="badge">Twitter tools</span>
-            <span class="badge">Local browser chat</span>
-          </div>
-        </header>
-
-        <div class="tool-strip" id="toolFeed">
-          <span class="tool-chip">Tool activity will appear here during a turn.</span>
-        </div>
-
-        <section class="thread" id="thread">
-          <div class="thread-shell">
-            <section class="empty-state" id="emptyState">
-              <div class="empty-card">
-                <div class="empty-mark"></div>
-                <h1>How can I help today?</h1>
-                <p>
-                  Use Bant-A-Bro like a compact ChatGPT-style workspace. Start with a smart-wallet question, an Agentic Wallet sign-in flow, a Twitter action, or a direct instruction and the live agent will respond here.
-                </p>
-                <div class="suggest-grid">
-                  <button class="suggest-card" type="button" data-prompt="Show the smart wallet details">
-                    <strong>Inspect the smart wallet</strong>
-                    <span>Show the built-in agent wallet, ownership details, and network.</span>
-                  </button>
-                  <button class="suggest-card" type="button" data-prompt="Sign in to my wallet with me@example.com">
-                    <strong>Start Agentic Wallet sign-in</strong>
-                    <span>Kick off email OTP authentication for a user wallet session.</span>
-                  </button>
-                  <button class="suggest-card" type="button" data-prompt="Show my agentic wallet balance">
-                    <strong>Check my Agentic Wallet balance</strong>
-                    <span>Use the authenticated wallet session to inspect balances.</span>
-                  </button>
-                  <button class="suggest-card" type="button" data-prompt="Help me fund my wallet">
-                    <strong>Fund my wallet</strong>
-                    <span>Open the funding flow and show the wallet address for deposits.</span>
-                  </button>
-                  <button class="suggest-card" type="button" data-prompt="Post this tweet: GM world">
-                    <strong>Post a tweet</strong>
-                    <span>Trigger the tweet action directly from this browser chat.</span>
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <div class="messages" id="messages">
-              <article class="message system">
-                <div class="message-card">
-                  <strong>System</strong>
-                  Browser UI attached. Send a message to start a streamed chat turn.
-                </div>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <footer class="composer-wrap">
-          <div class="composer-shell">
-            <form class="composer" id="chatForm">
-              <label for="promptInput" hidden>Message</label>
-              <textarea id="promptInput" placeholder="Message Bant-A-Bro..."></textarea>
-              <div class="composer-meta">
-                <div class="composer-tools">
-                  <span>Enter to send</span>
-                  <span>Shift+Enter for newline</span>
-                  <span>Smart wallet, Agentic Wallet, and Twitter tools</span>
-                </div>
-                <button class="send" id="sendButton" type="submit" aria-label="Send message">&#8593;</button>
-              </div>
-            </form>
-          </div>
-        </footer>
       </section>
-    </main>
 
-    <script>
-      const messagesContainer = document.getElementById("messages");
-      const chatForm = document.getElementById("chatForm");
-      const promptInput = document.getElementById("promptInput");
-      const sendButton = document.getElementById("sendButton");
-      const statusText = document.getElementById("statusText");
-      const twitterStatus = document.getElementById("twitterStatus");
-      const toolFeed = document.getElementById("toolFeed");
-      const newChatButton = document.getElementById("newChatButton");
-      const historyTitle = document.getElementById("historyTitle");
-      const historyMeta = document.getElementById("historyMeta");
-      const emptyState = document.getElementById("emptyState");
-      const interactivePrompts = document.querySelectorAll("[data-prompt]");
-      const thread = document.getElementById("thread");
+      <div class="sidebar-footer">
+        <span class="status-pill brand" id="statusText">Waiting for first message.</span>
+        <span class="status-pill" id="twitterStatus">Twitter status will appear after the first request.</span>
+      </div>
+    </aside>
+    <button class="sidebar-scrim" id="sidebarScrim" type="button" aria-label="Close navigation"></button>
 
-      const messages = [];
-      let pendingAssistant = null;
+    <section class="panel main">
+      <header class="main-top">
+        <div class="top-actions">
+          <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open navigation"
+            aria-controls="sidebarDrawer" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+          <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color mode">
+            <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 12.8A8.99 8.99 0 0 1 11.2 3 8.6 8.6 0 0 0 10 3 9 9 0 1 0 21 14c0-.4 0-.8-.1-1.2z" />
+            </svg>
+            <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path
+                d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6" />
+            </svg>
+          </button>
+        </div>
+      </header>
 
-      function autoResizeInput() {
-        promptInput.style.height = "auto";
-        promptInput.style.height = `${Math.min(promptInput.scrollHeight, 220)}px`;
+      <div class="tool-strip hidden" id="toolFeed">
+        <span class="tool-chip">Tool activity will appear here during a turn.</span>
+      </div>
+
+      <section class="thread" id="thread">
+        <div class="thread-shell">
+          <section class="empty-state" id="emptyState">
+            <div class="empty-card">
+              <div class="empty-mark">
+                <img src="/bantzzlogo.svg" alt="Bant-A-Bro logo" />
+              </div>
+              <h1>
+                <span class="hero-title-line">I can help you</span>
+                <span class="hero-rotator" id="heroRotator" aria-live="polite">Create a Prediction market</span>
+              </h1>
+              <p>
+                Creata your p2p predicition challenge on twitter.
+              </p>
+              <div class="suggest-grid">
+                <button class="suggest-card" type="button" data-prompt="Show the smart wallet details">
+                  <span class="suggest-icon" aria-hidden="true">
+                    <iconify-icon icon="solar:wallet-money-linear"></iconify-icon>
+                  </span>
+                  <span class="suggest-copy">
+                    <strong>Inspect the smart wallet</strong>
+                    <span>Check the built-in wallet and network.</span>
+                  </span>
+                </button>
+                <button class="suggest-card" type="button" data-prompt="Sign in to my wallet with me@example.com">
+                  <span class="suggest-icon" aria-hidden="true">
+                    <iconify-icon icon="solar:login-3-linear"></iconify-icon>
+                  </span>
+                  <span class="suggest-copy">
+                    <strong>Start wallet sign-in</strong>
+                    <span>Kick off email OTP authentication.</span>
+                  </span>
+                </button>
+                <button class="suggest-card" type="button" data-prompt="Help me fund my wallet">
+                  <span class="suggest-icon" aria-hidden="true">
+                    <iconify-icon icon="solar:card-send-linear"></iconify-icon>
+                  </span>
+                  <span class="suggest-copy">
+                    <strong>Fund my wallet</strong>
+                    <span>Open funding and show the deposit address.</span>
+                  </span>
+                </button>
+                <button class="suggest-card" type="button" data-prompt="Check my mentions">
+                  <span class="suggest-icon" aria-hidden="true">
+                    <iconify-icon icon="ri:twitter-x-line"></iconify-icon>
+                  </span>
+                  <span class="suggest-copy">
+                    <strong>Check mentions</strong>
+                    <span>Read the latest X mentions from chat.</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <div class="messages" id="messages">
+            <article class="message system">
+              <div class="message-card">
+                <strong>System</strong>
+                Browser UI attached. Send a message to start a streamed chat turn.
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <footer class="composer-wrap">
+        <div class="composer-shell">
+          <form class="composer" id="chatForm">
+            <label for="promptInput" hidden>Message</label>
+            <textarea id="promptInput" placeholder="Message Bant-A-Bro..."></textarea>
+            <div class="composer-meta">
+              <button class="send" id="sendButton" type="submit" aria-label="Send message">&#8593;</button>
+            </div>
+          </form>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    const messagesContainer = document.getElementById("messages");
+    const chatForm = document.getElementById("chatForm");
+    const promptInput = document.getElementById("promptInput");
+    const sendButton = document.getElementById("sendButton");
+    const themeToggle = document.getElementById("themeToggle");
+    const statusText = document.getElementById("statusText");
+    const twitterStatus = document.getElementById("twitterStatus");
+    const toolFeed = document.getElementById("toolFeed");
+    const newChatButton = document.getElementById("newChatButton");
+    const menuToggle = document.getElementById("menuToggle");
+    const drawerClose = document.getElementById("drawerClose");
+    const sidebarDrawer = document.getElementById("sidebarDrawer");
+    const sidebarScrim = document.getElementById("sidebarScrim");
+    const historyTitle = document.getElementById("historyTitle");
+    const historyMeta = document.getElementById("historyMeta");
+    const emptyState = document.getElementById("emptyState");
+    const interactivePrompts = document.querySelectorAll("[data-prompt]");
+    const thread = document.getElementById("thread");
+    const heroRotator = document.getElementById("heroRotator");
+
+    const messages = [];
+    let pendingAssistant = null;
+    const THEME_STORAGE_KEY = "bant-a-bro-theme";
+    const mobileDrawerQuery = window.matchMedia("(max-width: 980px)");
+    const heroPhrases = ["Create a Prediction", "Wallet", "Send", "Swap!"];
+    let heroPhraseIndex = 0;
+
+    function setSidebarOpen(open) {
+      const isMobile = mobileDrawerQuery.matches;
+      const nextOpen = isMobile && open;
+
+      sidebarDrawer.classList.toggle("is-open", nextOpen);
+      sidebarScrim.classList.toggle("is-open", nextOpen);
+      document.body.classList.toggle("drawer-open", nextOpen);
+      menuToggle.setAttribute("aria-expanded", String(nextOpen));
+      sidebarDrawer.setAttribute("aria-hidden", isMobile ? String(!nextOpen) : "false");
+    }
+
+    function getPreferredTheme() {
+      const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+      if (storedTheme === "light" || storedTheme === "dark") {
+        return storedTheme;
       }
 
-      function syncEmptyState() {
-        const hasConversation = messages.length > 0;
-        emptyState.classList.toggle("hidden", hasConversation);
-        messagesContainer.classList.toggle("active", hasConversation);
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+
+      const nextThemeLabel = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+      themeToggle.setAttribute("aria-pressed", String(theme === "dark"));
+      themeToggle.setAttribute("aria-label", nextThemeLabel);
+      themeToggle.setAttribute("title", nextThemeLabel);
+    }
+
+    function startHeroRotation() {
+      if (!heroRotator) {
+        return;
       }
 
-      function updateHistory() {
-        if (messages.length === 0) {
-          historyTitle.textContent = "Fresh session";
-          historyMeta.textContent = "No messages yet.";
-          return;
-        }
+      heroRotator.textContent = heroPhrases[heroPhraseIndex];
 
-        const latestUser = [...messages].reverse().find(message => message.role === "user");
-        historyTitle.textContent = latestUser ? latestUser.content.slice(0, 42) : "Current thread";
-        historyMeta.textContent = `${messages.length} message${messages.length === 1 ? "" : "s"} in memory`;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        return;
       }
 
-      function addMessage(role, content) {
-        const article = document.createElement("article");
-        article.className = `message ${role}`;
+      window.setInterval(() => {
+        heroRotator.classList.add("is-swapping");
 
-        const card = document.createElement("div");
-        card.className = "message-card";
+        window.setTimeout(() => {
+          heroPhraseIndex = (heroPhraseIndex + 1) % heroPhrases.length;
+          heroRotator.textContent = heroPhrases[heroPhraseIndex];
+          heroRotator.classList.remove("is-swapping");
+        }, 180);
+      }, 2400);
+    }
 
-        const label = document.createElement("strong");
-        label.textContent = role === "user" ? "You" : role === "assistant" ? "Agent" : "System";
+    function autoResizeInput() {
+      promptInput.style.height = "auto";
+      promptInput.style.height = `${Math.min(promptInput.scrollHeight, 220)}px`;
+    }
 
-        const body = document.createElement("div");
-        body.textContent = content;
+    function syncEmptyState() {
+      const hasConversation = messages.length > 0;
+      emptyState.classList.toggle("hidden", hasConversation);
+      messagesContainer.classList.toggle("active", hasConversation);
+    }
 
-        card.append(label, body);
-        article.appendChild(card);
-        messagesContainer.appendChild(article);
-        thread.scrollTop = thread.scrollHeight;
-        return { article, body };
+    function updateHistory() {
+      if (messages.length === 0) {
+        historyTitle.textContent = "Fresh session";
+        historyMeta.textContent = "No messages yet.";
+        return;
       }
 
-      function setBusy(busy) {
-        sendButton.disabled = busy;
-        sendButton.innerHTML = busy ? "..." : "&#8593;";
-      }
+      const latestUser = [...messages].reverse().find(message => message.role === "user");
+      historyTitle.textContent = latestUser ? latestUser.content.slice(0, 42) : "Current thread";
+      historyMeta.textContent = `${messages.length} message${messages.length === 1 ? "" : "s"} in memory`;
+    }
 
-      function setToolPlaceholder(text) {
+    function addMessage(role, content) {
+      const article = document.createElement("article");
+      article.className = `message ${role}`;
+
+      const card = document.createElement("div");
+      card.className = "message-card";
+
+      const label = document.createElement("strong");
+      label.textContent = role === "user" ? "You" : role === "assistant" ? "Agent" : "System";
+
+      const body = document.createElement("div");
+      body.textContent = content;
+
+      card.append(label, body);
+      article.appendChild(card);
+      messagesContainer.appendChild(article);
+      thread.scrollTop = thread.scrollHeight;
+      return { article, body };
+    }
+
+    function setBusy(busy) {
+      sendButton.disabled = busy;
+      sendButton.innerHTML = busy ? "..." : "&#8593;";
+    }
+
+    function setToolPlaceholder(text) {
+      toolFeed.innerHTML = "";
+      const chip = document.createElement("span");
+      chip.className = "tool-chip";
+      chip.textContent = text;
+      toolFeed.appendChild(chip);
+      toolFeed.classList.add("hidden");
+    }
+
+    function pushTool(toolName, output) {
+      if (toolFeed.children.length === 1 && toolFeed.firstElementChild.textContent.includes("appear here")) {
         toolFeed.innerHTML = "";
-        const chip = document.createElement("span");
-        chip.className = "tool-chip";
-        chip.textContent = text;
-        toolFeed.appendChild(chip);
       }
 
-      function pushTool(toolName, output) {
-        if (toolFeed.children.length === 1 && toolFeed.firstElementChild.textContent.includes("appear here")) {
-          toolFeed.innerHTML = "";
-        }
+      const chip = document.createElement("span");
+      chip.className = "tool-chip live";
+      chip.textContent = `${toolName}: ${output}`;
+      toolFeed.appendChild(chip);
+      toolFeed.classList.remove("hidden");
+    }
 
-        const chip = document.createElement("span");
-        chip.className = "tool-chip live";
-        chip.textContent = `${toolName}: ${output}`;
-        toolFeed.appendChild(chip);
-      }
-
-      function clearConversation() {
-        messages.length = 0;
-        messagesContainer.innerHTML = `
+    function clearConversation() {
+      messages.length = 0;
+      messagesContainer.innerHTML = `
           <article class="message system">
             <div class="message-card">
               <strong>System</strong>
@@ -803,149 +1301,181 @@
             </div>
           </article>
         `;
-        setToolPlaceholder("Tool activity will appear here during a turn.");
-        statusText.textContent = "Waiting for first message.";
-        twitterStatus.textContent = "Twitter status will appear after the first request.";
-        syncEmptyState();
-        updateHistory();
-        promptInput.value = "";
-        autoResizeInput();
-      }
-
-      async function sendMessage(prompt) {
-        const trimmed = prompt.trim();
-        if (!trimmed) {
-          return;
-        }
-
-        messages.push({ role: "user", content: trimmed });
-        syncEmptyState();
-        updateHistory();
-        addMessage("user", trimmed);
-        pendingAssistant = addMessage("assistant", "");
-        statusText.textContent = "Streaming response...";
-        setToolPlaceholder("Waiting for tool calls on this turn.");
-        setBusy(true);
-
-        try {
-          const response = await fetch("/api/chat", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ messages }),
-          });
-
-          if (!response.ok || !response.body) {
-            throw new Error(`Server error: ${response.status}`);
-          }
-
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let assistantText = "";
-
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) {
-              break;
-            }
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
-            for (const line of lines) {
-              if (!line.trim()) {
-                continue;
-              }
-
-              const event = JSON.parse(line);
-
-              if (event.type === "ready") {
-                twitterStatus.textContent = event.twitterEnabled
-                  ? "Twitter tools are enabled for this session."
-                  : "Twitter tools are disabled until the Twitter env vars are configured.";
-              }
-
-              if (event.type === "text-delta") {
-                assistantText += event.delta;
-                pendingAssistant.body.textContent = assistantText;
-                thread.scrollTop = thread.scrollHeight;
-              }
-
-              if (event.type === "tool-result") {
-                pushTool(event.toolName, event.output);
-              }
-
-              if (event.type === "error") {
-                pendingAssistant.body.textContent = event.message;
-                pendingAssistant.article.classList.add("danger");
-                statusText.textContent = "The request failed.";
-              }
-
-              if (event.type === "done") {
-                assistantText = event.text;
-                pendingAssistant.body.textContent = assistantText || "No response returned.";
-                messages.push({ role: "assistant", content: assistantText });
-                statusText.textContent = "Turn complete.";
-                updateHistory();
-
-                if (toolFeed.children.length === 1 && toolFeed.firstElementChild.textContent.includes("Waiting for tool calls")) {
-                  setToolPlaceholder("No tools were used on this turn.");
-                }
-              }
-            }
-          }
-        } catch (error) {
-          pendingAssistant.body.textContent = error instanceof Error ? error.message : "Request failed";
-          pendingAssistant.article.classList.add("danger");
-          statusText.textContent = "The request failed.";
-        } finally {
-          setBusy(false);
-          pendingAssistant = null;
-          thread.scrollTop = thread.scrollHeight;
-        }
-      }
-
-      chatForm.addEventListener("submit", async event => {
-        event.preventDefault();
-        const prompt = promptInput.value;
-        promptInput.value = "";
-        autoResizeInput();
-        await sendMessage(prompt);
-      });
-
-      promptInput.addEventListener("input", autoResizeInput);
-
-      promptInput.addEventListener("keydown", async event => {
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          if (!sendButton.disabled) {
-            const prompt = promptInput.value;
-            promptInput.value = "";
-            autoResizeInput();
-            await sendMessage(prompt);
-          }
-        }
-      });
-
-      newChatButton.addEventListener("click", () => {
-        clearConversation();
-        promptInput.focus();
-      });
-
-      interactivePrompts.forEach(button => {
-        button.addEventListener("click", () => {
-          promptInput.value = button.getAttribute("data-prompt") || "";
-          autoResizeInput();
-          promptInput.focus();
-        });
-      });
-
+      setToolPlaceholder("Tool activity will appear here during a turn.");
+      statusText.textContent = "Waiting for first message.";
+      twitterStatus.textContent = "Twitter status will appear after the first request.";
       syncEmptyState();
       updateHistory();
+      promptInput.value = "";
       autoResizeInput();
-    </script>
-  </body>
+    }
+
+    async function sendMessage(prompt) {
+      const trimmed = prompt.trim();
+      if (!trimmed) {
+        return;
+      }
+
+      messages.push({ role: "user", content: trimmed });
+      syncEmptyState();
+      updateHistory();
+      addMessage("user", trimmed);
+      pendingAssistant = addMessage("assistant", "");
+      statusText.textContent = "Streaming response...";
+      setToolPlaceholder("Waiting for tool calls on this turn.");
+      setBusy(true);
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ messages }),
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let assistantText = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) {
+              continue;
+            }
+
+            const event = JSON.parse(line);
+
+            if (event.type === "ready") {
+              twitterStatus.textContent = event.twitterEnabled
+                ? "Twitter tools are enabled for this session."
+                : "Twitter tools are disabled until the Twitter env vars are configured.";
+            }
+
+            if (event.type === "text-delta") {
+              assistantText += event.delta;
+              pendingAssistant.body.textContent = assistantText;
+              thread.scrollTop = thread.scrollHeight;
+            }
+
+            if (event.type === "tool-result") {
+              pushTool(event.toolName, event.output);
+            }
+
+            if (event.type === "error") {
+              pendingAssistant.body.textContent = event.message;
+              pendingAssistant.article.classList.add("danger");
+              statusText.textContent = "The request failed.";
+            }
+
+            if (event.type === "done") {
+              assistantText = event.text;
+              pendingAssistant.body.textContent = assistantText || "No response returned.";
+              messages.push({ role: "assistant", content: assistantText });
+              statusText.textContent = "Turn complete.";
+              updateHistory();
+
+              if (toolFeed.children.length === 1 && toolFeed.firstElementChild.textContent.includes("Waiting for tool calls")) {
+                setToolPlaceholder("No tools were used on this turn.");
+              }
+            }
+          }
+        }
+      } catch (error) {
+        pendingAssistant.body.textContent = error instanceof Error ? error.message : "Request failed";
+        pendingAssistant.article.classList.add("danger");
+        statusText.textContent = "The request failed.";
+      } finally {
+        setBusy(false);
+        pendingAssistant = null;
+        thread.scrollTop = thread.scrollHeight;
+      }
+    }
+
+    chatForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const prompt = promptInput.value;
+      promptInput.value = "";
+      autoResizeInput();
+      await sendMessage(prompt);
+    });
+
+    promptInput.addEventListener("input", autoResizeInput);
+
+    promptInput.addEventListener("keydown", async event => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        if (!sendButton.disabled) {
+          const prompt = promptInput.value;
+          promptInput.value = "";
+          autoResizeInput();
+          await sendMessage(prompt);
+        }
+      }
+    });
+
+    newChatButton.addEventListener("click", () => {
+      clearConversation();
+      setSidebarOpen(false);
+      promptInput.focus();
+    });
+
+    menuToggle.addEventListener("click", () => {
+      setSidebarOpen(!sidebarDrawer.classList.contains("is-open"));
+    });
+
+    drawerClose.addEventListener("click", () => {
+      setSidebarOpen(false);
+    });
+
+    sidebarScrim.addEventListener("click", () => {
+      setSidebarOpen(false);
+    });
+
+    themeToggle.addEventListener("click", () => {
+      const currentTheme = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+      applyTheme(currentTheme === "dark" ? "light" : "dark");
+    });
+
+    interactivePrompts.forEach(button => {
+      button.addEventListener("click", () => {
+        promptInput.value = button.getAttribute("data-prompt") || "";
+        autoResizeInput();
+        promptInput.focus();
+      });
+    });
+
+    mobileDrawerQuery.addEventListener("change", () => {
+      setSidebarOpen(false);
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && sidebarDrawer.classList.contains("is-open")) {
+        setSidebarOpen(false);
+      }
+    });
+
+    applyTheme(getPreferredTheme());
+    setSidebarOpen(false);
+    syncEmptyState();
+    updateHistory();
+    autoResizeInput();
+    startHeroRotation();
+  </script>
+</body>
+
 </html>

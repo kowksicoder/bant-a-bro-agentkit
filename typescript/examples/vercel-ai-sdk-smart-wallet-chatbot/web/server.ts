@@ -9,6 +9,7 @@ dotenv.config();
 
 const PORT = Number(process.env.PORT || 3000);
 const INDEX_FILE = path.resolve(__dirname, "index.html");
+const WEB_ROOT = path.resolve(__dirname);
 
 type ChatRequestBody = {
   messages?: ExampleMessage[];
@@ -34,6 +35,12 @@ function startServer() {
       if (req.method === "GET" && url.pathname === "/") {
         serveIndex(res);
         return;
+      }
+
+      if (req.method === "GET" && url.pathname !== "/api/chat") {
+        if (serveStaticAsset(url.pathname, res)) {
+          return;
+        }
       }
 
       if (req.method === "POST" && url.pathname === "/api/chat") {
@@ -66,6 +73,68 @@ function serveIndex(res: ServerResponse): void {
   const html = fs.readFileSync(INDEX_FILE, "utf8");
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(html);
+}
+
+/**
+ * Serve a static asset from the local web directory.
+ *
+ * @param pathname - Request pathname
+ * @param res - HTTP response
+ * @returns True when an asset was served
+ */
+function serveStaticAsset(pathname: string, res: ServerResponse): boolean {
+  const relativePath = decodeURIComponent(pathname).replace(/^\/+/, "");
+  if (!relativePath) {
+    return false;
+  }
+
+  const assetPath = path.resolve(WEB_ROOT, relativePath);
+  if (!assetPath.startsWith(WEB_ROOT)) {
+    return false;
+  }
+
+  if (!fs.existsSync(assetPath) || !fs.statSync(assetPath).isFile()) {
+    return false;
+  }
+
+  const ext = path.extname(assetPath).toLowerCase();
+  const contentType = getContentType(ext);
+  const body = fs.readFileSync(assetPath);
+  res.writeHead(200, { "Content-Type": contentType });
+  res.end(body);
+  return true;
+}
+
+/**
+ * Map a file extension to a response content type.
+ *
+ * @param ext - File extension
+ * @returns Content type header
+ */
+function getContentType(ext: string): string {
+  switch (ext) {
+    case ".svg":
+      return "image/svg+xml";
+    case ".ttf":
+      return "font/ttf";
+    case ".woff":
+      return "font/woff";
+    case ".woff2":
+      return "font/woff2";
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".js":
+      return "text/javascript; charset=utf-8";
+    case ".css":
+      return "text/css; charset=utf-8";
+    default:
+      return "application/octet-stream";
+  }
 }
 
 /**
