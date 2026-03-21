@@ -299,7 +299,12 @@ Recommended Railway setup:
    - `PORT` provided by Railway
 3. For the worker service, set:
    - `BANTABRO_SERVICE_ROLE=worker`
-4. Use the same core env vars on both services:
+4. Use the included templates as your starting point:
+   - `.env.railway.web.example`
+   - `.env.railway.worker.example`
+5. Mount a persistent volume at `/data` if you want SQLite state to survive restarts.
+   - This is where `BANTABRO_DB_PATH=/data/bantabro.sqlite` points.
+6. Use the same core env vars on both services:
    - `OPENAI_API_KEY`
    - `CDP_API_KEY_ID`
    - `CDP_API_KEY_SECRET`
@@ -314,7 +319,7 @@ Recommended Railway setup:
    - `BANTAH_CHALLENGE_MODE`
    - `BANT_A_BRO_WEB_URL`
    - `BANTABRO_DB_PATH`
-5. Add Twitter credentials to the worker service:
+7. Add Twitter credentials to the worker service:
    - `TWITTER_API_KEY`
    - `TWITTER_API_SECRET`
    - `TWITTER_ACCESS_TOKEN`
