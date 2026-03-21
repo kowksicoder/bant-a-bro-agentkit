@@ -1,8 +1,24 @@
 import * as fs from "fs";
 import * as path from "path";
 
-const PROJECT_KNOWLEDGE_PATH = path.resolve(__dirname, "..", "knowledge", "project.md");
-const KNOWLEDGE_SKILLS_DIR = path.resolve(__dirname, "..", "knowledge", "skills");
+function resolveExistingPath(...candidates: string[]): string {
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return candidates[0];
+}
+
+const PROJECT_KNOWLEDGE_PATH = resolveExistingPath(
+  path.resolve(process.cwd(), "knowledge", "project.md"),
+  path.resolve(__dirname, "..", "knowledge", "project.md"),
+);
+const KNOWLEDGE_SKILLS_DIR = resolveExistingPath(
+  path.resolve(process.cwd(), "knowledge", "skills"),
+  path.resolve(__dirname, "..", "knowledge", "skills"),
+);
 
 /**
  * Load the local project knowledge base used by the shared agent prompt.

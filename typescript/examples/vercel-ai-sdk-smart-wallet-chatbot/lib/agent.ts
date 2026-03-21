@@ -1,4 +1,3 @@
-import * as fs from "fs";
 import {
   AgentKit,
   type Action,
@@ -26,6 +25,24 @@ import {
   tradeAgenticWallet,
   verifyAgenticWallet,
 } from "./agenticWallet";
+import { getStoredSmartWallet, saveStoredSmartWallet } from "./persistence";
+import {
+  acceptBantahChallenge,
+  createBantahChallenge,
+  getBantahChallengeMessages,
+  getBantahChallengeProofs,
+  getBantahAvailability,
+  getBantahChallenge,
+  getBantahOnchainWalletBalance,
+  getBantahPublicAvailability,
+  getPublicBantahChallenge,
+  joinBantahChallenge,
+  listBantahChallenges,
+  listPublicBantahChallenges,
+  postBantahChallengeMessage,
+  submitBantahChallengeProof,
+  voteOnBantahChallenge,
+} from "./bantah";
 import { buildKnowledgePrompt } from "./knowledge";
 import { buildSkillsPrompt } from "./skills";
 import { getMentions, hasTwitterCredentials, postTweet, replyToTweet } from "./twitter";
@@ -46,9 +63,15 @@ export type ExampleAgent = {
   system: string;
   stopWhen: ReturnType<typeof stepCountIs>;
   tools: ToolSet;
+  twitterReplyTools: ToolSet;
   walletTools: ToolSet;
   agenticWalletTools: ToolSet;
   twitterEnabled: boolean;
+  bantahEnabled: boolean;
+};
+
+export type ExampleAgentOptions = {
+  bantahActingAsUserId?: string;
 };
 
 let exampleAgentPromise: Promise<ExampleAgent> | null = null;
@@ -77,12 +100,18 @@ export function validateEnvironment(): void {
  *
  * @returns Agent configuration for the chatbot and worker
  */
-export async function createExampleAgent(): Promise<ExampleAgent> {
+export async function createExampleAgent(options: ExampleAgentOptions = {}): Promise<ExampleAgent> {
+  const actingAsUserId = String(options.bantahActingAsUserId || "").trim();
+
+  if (actingAsUserId) {
+    return createExampleAgentInternal({ bantahActingAsUserId: actingAsUserId });
+  }
+
   if (exampleAgentPromise) {
     return exampleAgentPromise;
   }
 
-  exampleAgentPromise = createExampleAgentInternal();
+  exampleAgentPromise = createExampleAgentInternal({});
 
   try {
     return await exampleAgentPromise;
@@ -97,25 +126,29 @@ export async function createExampleAgent(): Promise<ExampleAgent> {
  *
  * @returns Agent configuration for the chatbot, worker, and web UI
  */
-async function createExampleAgentInternal(): Promise<ExampleAgent> {
+async function createExampleAgentInternal(
+  options: ExampleAgentOptions,
+): Promise<ExampleAgent> {
   validateEnvironment();
 
   const networkId = process.env.NETWORK_ID || "base-sepolia";
-  const walletDataFile = `wallet_data_${networkId.replace(/-/g, "_")}.txt`;
+  const actingAsUserId =
+    String(options.bantahActingAsUserId || "").trim() ||
+    String(process.env.BANTAH_ACTING_AS_USER_ID || "").trim();
 
   let smartAccountName: string | undefined;
   let smartWalletAddress: Address | undefined;
   let ownerAddress: Address | undefined;
 
-  if (fs.existsSync(walletDataFile)) {
-    try {
-      const walletData = JSON.parse(fs.readFileSync(walletDataFile, "utf8")) as WalletData;
+  try {
+    const walletData = getStoredSmartWallet(networkId) as WalletData | null;
+    if (walletData) {
       smartAccountName = walletData.smartAccountName;
-      smartWalletAddress = walletData.smartWalletAddress;
-      ownerAddress = walletData.ownerAddress;
-    } catch (error) {
-      console.error(`Error reading wallet data for ${networkId}:`, error);
+      smartWalletAddress = walletData.smartWalletAddress as Address;
+      ownerAddress = walletData.ownerAddress as Address;
     }
+  } catch (error) {
+    console.error(`Error reading stored wallet data for ${networkId}:`, error);
   }
 
   const walletProvider = await CdpSmartWalletProvider.configureWithWallet({
@@ -136,23 +169,30 @@ async function createExampleAgentInternal(): Promise<ExampleAgent> {
   });
 
   const data = await walletProvider.exportWallet();
-  fs.writeFileSync(
-    walletDataFile,
-    JSON.stringify({
-      smartAccountName: data.name,
-      smartWalletAddress: data.address,
-      ownerAddress: data.ownerAddress,
-    } as WalletData),
-  );
+  saveStoredSmartWallet(networkId, {
+    smartAccountName: data.name,
+    smartWalletAddress: data.address,
+    ownerAddress: data.ownerAddress,
+  } as WalletData);
 
   const walletTools = getExampleVercelAITools(agentKit);
   const agenticWalletTools = createAgenticWalletTools();
   const twitterEnabled = hasTwitterCredentials();
+  const bantahUserContextAvailable = Boolean(actingAsUserId);
+  const bantahAvailability = getBantahAvailability(actingAsUserId || undefined);
+  const bantahPublicAvailability = getBantahPublicAvailability();
+  const bantahEnabled = bantahAvailability.enabled;
   const tools: ToolSet = {
     ...walletTools,
     ...agenticWalletTools,
+    ...(bantahEnabled ? createBantahTools(actingAsUserId || undefined) : {}),
     ...(twitterEnabled ? createTwitterTools() : {}),
   };
+  const twitterReplyTools: ToolSet = createTwitterReplyTools({
+    bantahActingAsUserId: actingAsUserId || undefined,
+    bantahEnabled,
+    bantahPublicEnabled: bantahPublicAvailability.enabled,
+  });
 
   if (!twitterEnabled) {
     console.warn(
@@ -160,17 +200,34 @@ async function createExampleAgentInternal(): Promise<ExampleAgent> {
     );
   }
 
+  if (!bantahEnabled) {
+    const missingGlobalVars = bantahAvailability.missingGlobalVars.join(", ");
+    if (missingGlobalVars) {
+      console.warn(
+        `Warning: Bantah delegated auth is incomplete. Missing: ${missingGlobalVars}. Bantah tools will be disabled.`,
+      );
+    } else if (!bantahAvailability.offchainEnabled && !bantahAvailability.onchainEnabled) {
+      console.warn(
+        "Warning: Bantah base URLs are not configured. Bantah tools will be disabled.",
+      );
+    }
+  }
+
   return {
     model: openai.chat("gpt-4o-mini"),
     system: createSystemPrompt({
       canUseFaucet: walletProvider.getNetwork().networkId === "base-sepolia",
       twitterEnabled,
+      bantahEnabled,
+      bantahUserContextAvailable,
     }),
     stopWhen: stepCountIs(10),
     tools,
+    twitterReplyTools,
     walletTools,
     agenticWalletTools,
     twitterEnabled,
+    bantahEnabled,
   };
 }
 
@@ -255,6 +312,298 @@ function createTwitterTools(): ToolSet {
         success: true,
         action: "reply_to_tweet",
         tweet: await replyToTweet(tweetId, text),
+      }),
+    }),
+  };
+}
+
+/**
+ * Create public-safe Bantah read tools for social replies.
+ *
+ * These are suitable for Twitter/X mentions because they do not rely on
+ * delegated user auth and do not perform protected writes.
+ *
+ * @returns Bantah public-read tools for social reply generation
+ */
+function createTwitterBantahTools(): ToolSet {
+  return {
+    bantah_public_list_challenges: tool({
+      description:
+        "List public Bantah challenges for a public social reply. Use this for discovery questions such as what challenges are open.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+        feed: z
+          .string()
+          .optional()
+          .describe("Optional public feed selector. Defaults to all."),
+      }),
+      execute: async ({ target, feed }) => ({
+        success: true,
+        action: "bantah_public_list_challenges",
+        result: await listPublicBantahChallenges({ target, feed }),
+      }),
+    }),
+    bantah_public_get_challenge: tool({
+      description:
+        "Fetch public Bantah challenge details by id for a social reply.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+        challengeId: z.number().int().positive().describe("The Bantah challenge id."),
+      }),
+      execute: async ({ target, challengeId }) => ({
+        success: true,
+        action: "bantah_public_get_challenge",
+        result: await getPublicBantahChallenge({ target, challengeId }),
+      }),
+    }),
+  };
+}
+
+function createTwitterReplyTools(options: {
+  bantahActingAsUserId?: string;
+  bantahEnabled: boolean;
+  bantahPublicEnabled: boolean;
+}): ToolSet {
+  const tools: ToolSet = {};
+
+  if (options.bantahPublicEnabled) {
+    Object.assign(tools, createTwitterBantahTools());
+  }
+
+  if (options.bantahEnabled && options.bantahActingAsUserId) {
+    Object.assign(tools, createBantahTools(options.bantahActingAsUserId));
+  }
+
+  return tools;
+}
+
+/**
+ * Create Bantah tools backed by Bantah's offchain and onchain APIs.
+ *
+ * @returns Bantah-specific AI SDK tools
+ */
+function createBantahTools(actingAsUserId?: string): ToolSet {
+  return {
+    bantah_list_challenges: tool({
+      description:
+        "List Bantah challenges from the offchain or onchain feed. Use this when the user asks what challenges are open, active, or available.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+        feed: z
+          .string()
+          .optional()
+          .describe("Optional feed selector. Use 'all' for the global feed when needed."),
+      }),
+      execute: async ({ target, feed }) => ({
+        success: true,
+        action: "bantah_list_challenges",
+        result: await listBantahChallenges({ target, feed, actingAsUserId }),
+      }),
+    }),
+    bantah_get_challenge: tool({
+      description:
+        "Fetch a specific Bantah challenge by id from the offchain or onchain API.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+        challengeId: z.number().int().positive().describe("The Bantah challenge id."),
+      }),
+      execute: async ({ target, challengeId }) => ({
+        success: true,
+        action: "bantah_get_challenge",
+        result: await getBantahChallenge({ target, challengeId, actingAsUserId }),
+      }),
+    }),
+    bantah_create_challenge: tool({
+      description:
+        "Create a Bantah challenge. Use the offchain target for standard challenge creation. Use the onchain target only when the request explicitly includes chain/token context.",
+      inputSchema: z.object({
+        target: z
+          .enum(["offchain", "onchain"])
+          .optional()
+          .describe("Which Bantah surface to create the challenge on."),
+        title: z.string().min(1).describe("Challenge title."),
+        category: z.string().min(1).describe("Challenge category."),
+        amount: z.number().int().positive().describe("Stake amount in Bantah units."),
+        description: z.string().optional().describe("Optional challenge description."),
+        dueDate: z.string().optional().describe("Optional ISO due date."),
+        challenged: z
+          .string()
+          .optional()
+          .describe("Optional Bantah user id for direct offchain challenges."),
+        challengedWalletAddress: z
+          .string()
+          .optional()
+          .describe("Optional wallet address for direct onchain challenges."),
+        chainId: z.number().int().positive().optional().describe("Optional onchain chain id."),
+        tokenSymbol: z
+          .string()
+          .optional()
+          .describe("Optional onchain token symbol, for example USDC."),
+      }),
+      execute: async input => ({
+        success: true,
+        action: "bantah_create_challenge",
+        result: await createBantahChallenge({ ...input, actingAsUserId }),
+      }),
+    }),
+    bantah_accept_challenge: tool({
+      description:
+        "Accept a Bantah challenge. For onchain challenges, provide escrowTxHash when the user has already completed the wallet transaction.",
+      inputSchema: z.object({
+        target: z
+          .enum(["offchain", "onchain"])
+          .optional()
+          .describe("Which Bantah surface the challenge belongs to."),
+        challengeId: z.number().int().positive().describe("The Bantah challenge id."),
+        escrowTxHash: z
+          .string()
+          .optional()
+          .describe("Required for contract-backed onchain accept flows after the user signs."),
+      }),
+      execute: async ({ target, challengeId, escrowTxHash }) => ({
+        success: true,
+        action: "bantah_accept_challenge",
+        result: await acceptBantahChallenge({
+          target,
+          challengeId,
+          escrowTxHash,
+          actingAsUserId,
+        }),
+        }),
+      }),
+    bantah_join_challenge: tool({
+      description:
+        "Join an admin-created Bantah YES/NO challenge. For onchain joins, provide escrowTxHash only after the user completes the wallet step.",
+      inputSchema: z.object({
+        target: z
+          .enum(["offchain", "onchain"])
+          .optional()
+          .describe("Which Bantah surface the challenge belongs to."),
+        challengeId: z.number().int().positive().describe("The Bantah challenge id."),
+        stake: z.enum(["YES", "NO"]).describe("Which side to join."),
+        escrowTxHash: z
+          .string()
+          .optional()
+          .describe("Required for contract-backed onchain joins after the user signs."),
+      }),
+      execute: async ({ target, challengeId, stake, escrowTxHash }) => ({
+        success: true,
+        action: "bantah_join_challenge",
+        result: await joinBantahChallenge({
+          target,
+          challengeId,
+          stake,
+          escrowTxHash,
+          actingAsUserId,
+        }),
+      }),
+    }),
+    bantah_get_challenge_messages: tool({
+      description:
+        "Read Bantah challenge messages/comments for a specific challenge.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+        challengeId: z.number().int().positive().describe("The Bantah challenge id."),
+      }),
+      execute: async ({ target, challengeId }) => ({
+        success: true,
+        action: "bantah_get_challenge_messages",
+        result: await getBantahChallengeMessages({ target, challengeId, actingAsUserId }),
+      }),
+    }),
+    bantah_post_challenge_message: tool({
+      description:
+        "Post a message or comment into a Bantah challenge thread.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface the challenge belongs to."),
+        challengeId: z.number().int().positive().describe("The Bantah challenge id."),
+        message: z.string().min(1).describe("The text message to post."),
+        type: z.string().optional().describe("Optional message type. Defaults to text."),
+        evidence: z.unknown().nullable().optional().describe("Optional evidence payload to attach."),
+      }),
+      execute: async ({ target, challengeId, message, type, evidence }) => ({
+        success: true,
+        action: "bantah_post_challenge_message",
+        result: await postBantahChallengeMessage({
+          target,
+          challengeId,
+          message,
+          type,
+          evidence,
+          actingAsUserId,
+        }),
+      }),
+    }),
+    bantah_get_challenge_proofs: tool({
+      description:
+        "Read proof or evidence entries that have already been attached to a Bantah challenge.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+        challengeId: z.number().int().positive().describe("The Bantah challenge id."),
+      }),
+      execute: async ({ target, challengeId }) => ({
+        success: true,
+        action: "bantah_get_challenge_proofs",
+        result: await getBantahChallengeProofs({ target, challengeId, actingAsUserId }),
+      }),
+    }),
+    bantah_submit_challenge_proof: tool({
+      description:
+        "Submit proof or evidence for a Bantah challenge.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface the challenge belongs to."),
+        challengeId: z.number().int().positive().describe("The Bantah challenge id."),
+        proofUri: z.string().min(1).describe("A URL or URI pointing to the proof."),
+        proofHash: z.string().min(1).describe("The proof hash, for example sha256:..."),
+      }),
+      execute: async ({ target, challengeId, proofUri, proofHash }) => ({
+        success: true,
+        action: "bantah_submit_challenge_proof",
+        result: await submitBantahChallengeProof({
+          target,
+          challengeId,
+          proofUri,
+          proofHash,
+          actingAsUserId,
+        }),
+      }),
+    }),
+    bantah_vote_on_challenge: tool({
+      description:
+        "Submit a Bantah challenge vote after the user or client has already produced the signed vote payload.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface the challenge belongs to."),
+        challengeId: z.number().int().positive().describe("The Bantah challenge id."),
+        voteChoice: z
+          .enum(["challenger", "challenged", "creator", "opponent"])
+          .describe("Who the vote favors."),
+        proofHash: z.string().min(1).describe("The proof hash tied to this vote."),
+        signedVote: z
+          .string()
+          .min(1)
+          .describe("The signed vote JSON payload produced by the user or client."),
+      }),
+      execute: async ({ target, challengeId, voteChoice, proofHash, signedVote }) => ({
+        success: true,
+        action: "bantah_vote_on_challenge",
+        result: await voteOnBantahChallenge({
+          target,
+          challengeId,
+          voteChoice,
+          proofHash,
+          signedVote,
+          actingAsUserId,
+        }),
+      }),
+    }),
+    bantah_onchain_wallet_balance: tool({
+      description:
+        "Get the Bantah onchain wallet balance for the configured acting user.",
+      inputSchema: z.object({}),
+      execute: async () => ({
+        success: true,
+        action: "bantah_onchain_wallet_balance",
+        result: await getBantahOnchainWalletBalance(actingAsUserId),
       }),
     }),
   };
@@ -398,7 +747,12 @@ function createAgenticWalletTools(): ToolSet {
  * @param options.twitterEnabled - Whether Twitter tools are available in this run
  * @returns The system prompt string
  */
-function createSystemPrompt(options: { canUseFaucet: boolean; twitterEnabled: boolean }): string {
+function createSystemPrompt(options: {
+  canUseFaucet: boolean;
+  twitterEnabled: boolean;
+  bantahEnabled: boolean;
+  bantahUserContextAvailable: boolean;
+}): string {
   const faucetMessage = options.canUseFaucet
     ? "If you ever need funds, you can request them from the faucet."
     : "If you need funds, you can provide your wallet details and request funds from the user.";
@@ -424,6 +778,28 @@ Use reply_to_tweet when the user asks you to answer a mention or a specific twee
 If the user says "Reply to my latest mention", call get_mentions first, choose the newest relevant mention, then call reply_to_tweet.`
     : "Twitter (X) tools are not available right now because the required Twitter credentials are missing.";
 
+  const bantahMessage = !options.bantahUserContextAvailable
+    ? `Bantah protected challenge actions require a real Bantah account and active sign-in context.
+If a user wants to create, accept, join, prove, vote, or settle a Bantah challenge and you do not have confirmed Bantah user context for them, tell them to create an account or sign in first at https://onchain.bantah.fun, then continue there.
+You may still answer safe public Bantah questions when public reads are available.`
+    : options.bantahEnabled
+    ? `You also have Bantah first-party product tools.
+In the current build, Bantah challenge flows are onchain-only.
+Do not route users into offchain Bantah challenge creation or participation from this agent.
+Use bantah_list_challenges to inspect current onchain Bantah challenges.
+Use bantah_get_challenge to retrieve a specific onchain Bantah challenge by id.
+Use bantah_create_challenge to create an onchain Bantah challenge when the user clearly wants to create one.
+Use bantah_accept_challenge when the user clearly wants to accept an onchain Bantah challenge.
+Use bantah_join_challenge for admin-created onchain YES/NO challenges that require picking a side.
+Use bantah_get_challenge_messages and bantah_post_challenge_message for onchain challenge discussion.
+Use bantah_get_challenge_proofs and bantah_submit_challenge_proof for onchain evidence flows.
+Use bantah_vote_on_challenge only after the user or client has already produced the required signed vote payload.
+Use bantah_onchain_wallet_balance to inspect the configured Bantah user's onchain balance.
+Bantah is the source of truth for challenge execution, status, and settlement.
+If an onchain Bantah action requires a wallet signature or escrow transaction hash, explain that the user must complete the wallet step first before the action can finish.
+If Bantah voting requires a signedVote payload or registered signing key, explain that the client or user must complete that signing step first before the vote can be submitted.`
+    : "Bantah challenge tools are not available right now because Bantah internal access is not configured.";
+
   return `You are a helpful agent that can interact onchain using the Coinbase Developer Platform AgentKit.
 You are empowered to interact onchain using your tools. ${faucetMessage}
 Before executing your first smart-wallet action, get the smart-wallet details to see what network you're on.
@@ -431,6 +807,7 @@ ${skillsMessage}
 ${knowledgeMessage}
 ${agenticWalletMessage}
 ${twitterMessage}
+${bantahMessage}
 If there is a 5XX (internal) HTTP error code, ask the user to try again later.
 If someone asks you to do something you can't do with your currently available tools, you must say so, and
 encourage them to implement it themselves using the CDP SDK + AgentKit. Recommend they go to

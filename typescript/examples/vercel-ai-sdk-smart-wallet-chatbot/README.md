@@ -33,6 +33,7 @@ The chatbot now carries two wallet layers:
 
 - smart-wallet tools from AgentKit for the app's built-in Coinbase smart wallet
 - Agentic Wallet tools backed by the `awal` CLI for a user-authenticated wallet session
+- Bantah challenge tools backed by Bantah's internal offchain and onchain APIs
 
 The Agentic Wallet tool names are:
 
@@ -54,6 +55,20 @@ The Twitter tools are:
 - `get_mentions`
 - `reply_to_tweet`
 
+The Bantah tools are:
+
+- `bantah_list_challenges`
+- `bantah_get_challenge`
+- `bantah_create_challenge`
+- `bantah_accept_challenge`
+- `bantah_join_challenge`
+- `bantah_get_challenge_messages`
+- `bantah_post_challenge_message`
+- `bantah_get_challenge_proofs`
+- `bantah_submit_challenge_proof`
+- `bantah_vote_on_challenge`
+- `bantah_onchain_wallet_balance`
+
 - for "Sign in to my wallet with ..." it should call `agentic_wallet_auth_login`
 - for OTP verification it should call `agentic_wallet_auth_verify`
 - for "Show my agentic wallet balance" it should call `agentic_wallet_balance`
@@ -63,6 +78,10 @@ The Twitter tools are:
 - for "Post this tweet: ..." it should call `post_tweet`
 - for "Check my mentions" it should call `get_mentions`
 - for "Reply to my latest mention" it should call `get_mentions` first, then `reply_to_tweet`
+- for "Show open Bantah challenges" it should call `bantah_list_challenges`
+- for "Get Bantah challenge 42" it should call `bantah_get_challenge`
+- for "Create a Bantah challenge..." it should call `bantah_create_challenge`
+- for "Accept Bantah challenge 42" it should call `bantah_accept_challenge`
 
 Tool results are printed during streaming so you can see what the agent actually executed.
 
@@ -107,11 +126,12 @@ If you want to expand later, split the knowledge base into additional markdown f
 - `lib/knowledge.ts`: local project knowledge loader that injects `knowledge/project.md` into the shared prompt
 - `knowledge/project.md`: editable project about/knowledge-base markdown for Bant-A-Bro
 - `lib/twitter.ts`: local Twitter service using `twitter-api-v2`; handles posting tweets, reading mentions, and replying
+- `lib/bantah.ts`: Bantah internal API client and delegated auth signer for challenge and balance tools
 - `lib/agent.ts`: shared agent initialization, merged tool registration, environment checks, and prompt assembly
 - `web/server.ts`: local HTTP server that exposes a browser chat endpoint and streams model output plus tool results
 - `web/index.html`: single-page chat UI wired into the same agent
-- `workers/twitterWorker.ts`: background worker that polls mentions every 15 seconds, drafts replies with the agent, posts them, and persists processed tweet IDs
-- `twitter_worker_state.json`: created automatically the first time the worker runs to avoid duplicate replies
+- `workers/twitterWorker.ts`: background worker that polls mentions every 15 seconds, drafts replies with the agent, uses public or linked-user Bantah tools when appropriate, posts replies, and persists mention state in SQLite
+- `lib/persistence.ts`: SQLite-backed persistence layer for smart-wallet snapshots, Twitter worker checkpoints, social identity links, and audit logs
 
 ## Prerequisites
 
@@ -147,9 +167,45 @@ Rename `.env-local` to `.env` and fill in:
 - `TWITTER_API_SECRET`
 - `TWITTER_ACCESS_TOKEN`
 - `TWITTER_ACCESS_TOKEN_SECRET`
-- `BANT_A_BRO_WEB_URL` optional, defaults to `http://localhost:3000`
+- `BANTAH_OFFCHAIN_BASE_URL` optional, enables offchain Bantah tools
+- `BANTAH_ONCHAIN_BASE_URL` optional, enables onchain Bantah tools
+- `BANTAH_AGENT_TOKEN_SECRET` required for Bantah delegated auth
+- `BANTAH_ACTING_AS_USER_ID` optional, local development fallback when no real Bantah session is available
+- `BANTAH_AGENT_SERVICE_ID` optional, defaults to `service:bantah-ai-agent`
+- `BANTAH_OFFCHAIN_AUDIENCE` optional, defaults to `bantah-offchain`
+- `BANTAH_ONCHAIN_AUDIENCE` optional, defaults to `bantah-onchain`
+- `BANTAH_AGENT_TOKEN_TTL_MS` optional, defaults to 15 minutes
+- `BANTAH_CHALLENGE_MODE` optional, defaults to `onchain_only` in the current build
+- `BANT_A_BRO_WEB_URL` optional, defaults to `https://onchain.bantah.fun`
 - `BANTZZ_WEB_URL` also works as a backward-compatible fallback
+- `BANTABRO_DB_PATH` optional, defaults to `./data/bantabro.sqlite`
+- `BANTAH_ALLOW_DEV_CONTEXT_FALLBACK` optional, defaults to `true` outside production
+- `BANTAH_CONTEXT_HEADER_SECRET` optional, lets a trusted Bantah proxy inject `x-bantah-user-id` style headers safely
+- `BANTABRO_FORCE_KNOWLEDGEBASE_MODE` optional, serves Bantah informational answers from the local knowledge base without calling the model
 - `NETWORK_ID` optional, defaults to `base-sepolia`
+
+Bantah notes:
+
+- The current example prefers real Bantah session handoff first: trusted proxy headers, forwarded bearer auth, or forwarded Bantah cookies.
+- `BANTAH_ACTING_AS_USER_ID` is now just a development fallback, not the primary production identity path.
+- The current Bant-A-Bro challenge flow is intentionally `onchain_only`. Offchain challenge actions are left in code but blocked at runtime for now.
+- The web server also exposes `GET /api/session` plus `GET/POST /api/channel-links/twitter` for resolved Bantah session inspection and linked Twitter identity persistence.
+- A production Bantah deployment should pass identity through real Bantah auth/session context instead of relying on one fixed env user id.
+- The Agent now includes a deterministic Bantah knowledge fallback for common Bantah product questions when the model provider is unavailable or quota is exhausted.
+
+Example web chat request with Bantah user context:
+
+```json
+{
+  "bantahUserId": "user_123",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Create a Bantah challenge that Arsenal beats Chelsea for 5000."
+    }
+  ]
+}
+```
 
 ## Build
 
@@ -217,9 +273,10 @@ The worker:
 
 - polls mentions every 15 seconds
 - logs each new mention
+- resolves whether the mention author is linked to a Bantah user
 - asks the agent to draft a reply
 - sends the reply with `replyToTweet`
-- stores processed mention IDs in `twitter_worker_state.json`
+- stores processed mention IDs and link state in the SQLite persistence store
 
 ## Expected behavior
 

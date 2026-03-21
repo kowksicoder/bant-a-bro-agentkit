@@ -11,6 +11,8 @@ export type TwitterMention = {
   id: string;
   text: string;
   authorId?: string;
+  authorUsername?: string;
+  authorName?: string;
   conversationId?: string;
   createdAt?: string;
   referencedTweets?: Array<{
@@ -26,13 +28,22 @@ export type MentionsResult = {
 
 type MentionTimelineResponse = {
   tweets?: Array<Record<string, unknown>>;
+  includes?: {
+    users?: Array<Record<string, unknown>>;
+  };
   data?: {
     data?: Array<Record<string, unknown>>;
     meta?: Record<string, unknown>;
+    includes?: {
+      users?: Array<Record<string, unknown>>;
+    };
   };
   _realData?: {
     data?: Array<Record<string, unknown>>;
     meta?: Record<string, unknown>;
+    includes?: {
+      users?: Array<Record<string, unknown>>;
+    };
   };
 };
 
@@ -101,14 +112,35 @@ export async function getMentions(): Promise<MentionsResult> {
     max_results: 10,
     expansions: ["author_id"],
     "tweet.fields": ["author_id", "conversation_id", "created_at", "referenced_tweets"],
+    "user.fields": ["username", "name"],
   })) as unknown as MentionTimelineResponse;
 
   const rawMentions = response.tweets ?? response.data?.data ?? response._realData?.data ?? [];
+  const rawUsers =
+    response.includes?.users ??
+    response.data?.includes?.users ??
+    response._realData?.includes?.users ??
+    [];
+  const usersById = new Map(
+    rawUsers.map(rawUser => [
+      String(rawUser.id ?? ""),
+      {
+        username: rawUser.username !== undefined ? String(rawUser.username) : undefined,
+        name: rawUser.name !== undefined ? String(rawUser.name) : undefined,
+      },
+    ]),
+  );
 
   const mentions = rawMentions.map(rawMention => ({
     id: String(rawMention.id ?? ""),
     text: String(rawMention.text ?? ""),
     authorId: rawMention.author_id !== undefined ? String(rawMention.author_id) : undefined,
+    authorUsername: rawMention.author_id !== undefined
+      ? usersById.get(String(rawMention.author_id))?.username
+      : undefined,
+    authorName: rawMention.author_id !== undefined
+      ? usersById.get(String(rawMention.author_id))?.name
+      : undefined,
     conversationId:
       rawMention.conversation_id !== undefined ? String(rawMention.conversation_id) : undefined,
     createdAt: rawMention.created_at !== undefined ? String(rawMention.created_at) : undefined,

@@ -19,6 +19,14 @@ dotenv.config();
 async function runChatMode(agent: ExampleAgent) {
   console.log("Starting chat mode... Type 'exit' to end.");
 
+  if (agent.bantahEnabled) {
+    console.log(
+      "Bantah tools enabled: bantah_list_challenges, bantah_get_challenge, bantah_create_challenge, bantah_accept_challenge, bantah_onchain_wallet_balance.",
+    );
+  } else {
+    console.log("Bantah tools disabled. Add Bantah internal auth env vars to enable them.");
+  }
+
   if (agent.twitterEnabled) {
     console.log("Twitter tools enabled: post_tweet, get_mentions, reply_to_tweet.");
   } else {

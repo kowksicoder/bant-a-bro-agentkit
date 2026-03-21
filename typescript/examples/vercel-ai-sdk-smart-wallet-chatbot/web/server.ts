@@ -3,20 +3,68 @@ import * as fs from "fs";
 import * as path from "path";
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { streamText } from "ai";
-import { createExampleAgent, formatToolOutput, type ExampleMessage } from "../lib/agent";
+import { resolveBantahUserContext } from "../lib/bantahContext";
+import {
+  getBantahKnowledgeFallbackReply,
+  isLikelyBantahKnowledgeQuestion,
+  isLikelyModelAvailabilityError,
+} from "../lib/bantahKnowledgeFallback";
+import {
+  listSocialIdentityLinksForBantahUser,
+  logAgentAuditEvent,
+  upsertSocialIdentityLink,
+} from "../lib/persistence";
 
 dotenv.config();
 
 const PORT = Number(process.env.PORT || 3000);
-const INDEX_FILE = path.resolve(__dirname, "index.html");
-const WEB_ROOT = path.resolve(__dirname);
+const BANTAH_BOOTSTRAP_TAG = "__BANTABRO_BOOTSTRAP__";
+
+type ExampleMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
+type ExampleAgentModule = typeof import("../lib/agent");
+
+function resolveExistingPath(...candidates: string[]): string {
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return candidates[0];
+}
+
+const WEB_ROOT = resolveExistingPath(
+  path.resolve(process.cwd(), "web"),
+  path.resolve(__dirname),
+);
+const INDEX_FILE = resolveExistingPath(
+  path.resolve(WEB_ROOT, "index.html"),
+  path.resolve(__dirname, "index.html"),
+);
 
 type ChatRequestBody = {
   messages?: ExampleMessage[];
+  bantahUserId?: string;
+};
+
+type TwitterLinkRequestBody = {
+  twitterUserId?: string;
+  twitterUsername?: string;
 };
 
 type StreamEvent =
-  | { type: "ready"; twitterEnabled: boolean }
+  | {
+      type: "ready";
+      twitterEnabled: boolean;
+      bantahEnabled: boolean;
+      bantahAuthenticated: boolean;
+      bantahUserId?: string | null;
+      bantahUsername?: string | null;
+    }
   | { type: "text-delta"; delta: string }
   | { type: "tool-result"; toolName: string; output: string }
   | { type: "done"; text: string }
@@ -28,34 +76,7 @@ type StreamEvent =
  * @returns The created HTTP server
  */
 function startServer() {
-  const server = createServer(async (req, res) => {
-    try {
-      const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-
-      if (req.method === "GET" && url.pathname === "/") {
-        serveIndex(res);
-        return;
-      }
-
-      if (req.method === "GET" && url.pathname !== "/api/chat") {
-        if (serveStaticAsset(url.pathname, res)) {
-          return;
-        }
-      }
-
-      if (req.method === "POST" && url.pathname === "/api/chat") {
-        await handleChatRequest(req, res);
-        return;
-      }
-
-      res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ error: "Not found" }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unexpected server error";
-      res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ error: message }));
-    }
-  });
+  const server = createServer(handleWebRequest);
 
   server.listen(PORT, () => {
     console.log(`Web chat ready at http://localhost:${PORT}`);
@@ -64,15 +85,75 @@ function startServer() {
   return server;
 }
 
+export async function handleWebRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
+  try {
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+
+    if (req.method === "GET" && url.pathname === "/") {
+      await serveIndex(req, url, res);
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/session") {
+      await handleSessionRequest(req, url, res);
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/channel-links/twitter") {
+      await handleTwitterLinkListRequest(req, url, res);
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname !== "/api/chat") {
+      if (serveStaticAsset(url.pathname, res)) {
+        return;
+      }
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/chat") {
+      await handleChatRequest(req, res);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/channel-links/twitter") {
+      await handleTwitterLinkRequest(req, res);
+      return;
+    }
+
+    res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ error: "Not found" }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected server error";
+    res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ error: message }));
+  }
+}
+
 /**
  * Serve the single-page chat interface.
  *
+ * @param req - HTTP request
  * @param res - HTTP response
  */
-function serveIndex(res: ServerResponse): void {
+async function serveIndex(req: IncomingMessage, url: URL, res: ServerResponse): Promise<void> {
   const html = fs.readFileSync(INDEX_FILE, "utf8");
+  const bantahContext = await resolveBantahUserContext({
+    headers: req.headers,
+    queryBantahUserId: url.searchParams.get("bantahUserId")?.trim() || undefined,
+  });
+  const bootstrapPayload = JSON.stringify({
+    bantahSession: bantahContext,
+    bantahUserId: bantahContext.userId || "",
+  }).replace(/</g, "\\u003c");
+  const bootstrappedHtml = html.replace(
+    "</head>",
+    `  <script>window.${BANTAH_BOOTSTRAP_TAG} = ${bootstrapPayload};</script>\n</head>`,
+  );
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-  res.end(html);
+  res.end(bootstrappedHtml);
 }
 
 /**
@@ -147,7 +228,20 @@ function getContentType(ext: string): string {
 async function handleChatRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody(req);
   const messages = sanitizeMessages(body.messages);
-  const agent = await createExampleAgent();
+  const bantahContext = await resolveBantahUserContext({
+    headers: req.headers,
+    bodyBantahUserId: typeof body.bantahUserId === "string" ? body.bantahUserId.trim() : undefined,
+  });
+  const bantahFallbackReply = getBantahKnowledgeFallbackReply(messages, {
+    bantahAuthenticated: bantahContext.isAuthenticated,
+    bantahUsername: bantahContext.username,
+    channel: "web",
+  });
+  const shouldAttemptKnowledgeOnly =
+    (!String(process.env.OPENAI_API_KEY || "").trim() ||
+      String(process.env.BANTABRO_FORCE_KNOWLEDGEBASE_MODE || "").trim() === "true") &&
+    Boolean(bantahFallbackReply);
+  const knowledgeOnlyMode = String(process.env.BANTABRO_FORCE_KNOWLEDGEBASE_MODE || "").trim() === "true";
 
   res.writeHead(200, {
     "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -155,7 +249,120 @@ async function handleChatRequest(req: IncomingMessage, res: ServerResponse): Pro
     Connection: "keep-alive",
   });
 
-  sendEvent(res, { type: "ready", twitterEnabled: agent.twitterEnabled });
+  if (shouldAttemptKnowledgeOnly) {
+    sendEvent(res, {
+      type: "ready",
+      twitterEnabled: false,
+      bantahEnabled: true,
+      bantahAuthenticated: bantahContext.isAuthenticated,
+      bantahUserId: bantahContext.userId,
+      bantahUsername: bantahContext.username,
+    });
+
+    streamFallbackReply(res, bantahFallbackReply!);
+    res.end();
+    logAgentAuditEvent({
+      channel: "web",
+      eventType: "bantah_knowledge_fallback_served",
+      bantahUserId: bantahContext.userId,
+      status: "processed",
+      detail: "Served Bantah knowledge base fallback without model call.",
+      metadata: {
+        reason: "model_not_configured_or_forced_fallback",
+        authSource: bantahContext.source,
+      },
+    });
+    return;
+  }
+
+  if (knowledgeOnlyMode) {
+    const reply =
+      bantahFallbackReply ||
+      "Bant-A-Bro is currently running in knowledge mode. I can answer Bantah product questions right now, but live wallet and action execution are temporarily unavailable.";
+
+    sendEvent(res, {
+      type: "ready",
+      twitterEnabled: false,
+      bantahEnabled: true,
+      bantahAuthenticated: bantahContext.isAuthenticated,
+      bantahUserId: bantahContext.userId,
+      bantahUsername: bantahContext.username,
+    });
+    streamFallbackReply(res, reply);
+    res.end();
+    logAgentAuditEvent({
+      channel: "web",
+      eventType: "knowledge_mode_reply_served",
+      bantahUserId: bantahContext.userId,
+      status: "processed",
+      detail: "Served knowledge mode reply without loading the live agent runtime.",
+      metadata: {
+        authSource: bantahContext.source,
+      },
+    });
+    return;
+  }
+
+  let agent;
+  let formatToolOutput: ExampleAgentModule["formatToolOutput"];
+  try {
+    const agentModule = (await import("../lib/agent")) as ExampleAgentModule;
+    formatToolOutput = agentModule.formatToolOutput;
+    agent = await agentModule.createExampleAgent({
+      bantahActingAsUserId: bantahContext.userId || undefined,
+    });
+  } catch (error) {
+    if (bantahFallbackReply && isLikelyBantahKnowledgeQuestion(messages)) {
+      sendEvent(res, {
+        type: "ready",
+        twitterEnabled: false,
+        bantahEnabled: true,
+        bantahAuthenticated: bantahContext.isAuthenticated,
+        bantahUserId: bantahContext.userId,
+        bantahUsername: bantahContext.username,
+      });
+      streamFallbackReply(res, bantahFallbackReply);
+      res.end();
+      logAgentAuditEvent({
+        channel: "web",
+        eventType: "bantah_knowledge_fallback_served",
+        bantahUserId: bantahContext.userId,
+        status: "processed",
+        detail: error instanceof Error ? error.message : "Agent initialization failed; served fallback.",
+        metadata: {
+          reason: "agent_initialization_failed",
+          authSource: bantahContext.source,
+        },
+      });
+      return;
+    }
+
+    sendEvent(res, {
+      type: "error",
+      message: error instanceof Error ? error.message : "Failed to initialize agent",
+    });
+    logAgentAuditEvent({
+      channel: "web",
+      eventType: "chat_turn_failed",
+      bantahUserId: bantahContext.userId,
+      status: "failed",
+      detail: error instanceof Error ? error.message : "Failed to initialize agent",
+      metadata: {
+        authSource: bantahContext.source,
+      },
+    });
+    res.end();
+    return;
+  }
+
+  sendEvent(res, {
+    type: "ready",
+    twitterEnabled: agent.twitterEnabled,
+    bantahEnabled: agent.bantahEnabled,
+    bantahAuthenticated: bantahContext.isAuthenticated,
+    bantahUserId: bantahContext.userId,
+    bantahUsername: bantahContext.username,
+  });
 
   try {
     const result = streamText({
@@ -182,14 +389,152 @@ async function handleChatRequest(req: IncomingMessage, res: ServerResponse): Pro
     }
 
     sendEvent(res, { type: "done", text: fullResponse });
+    logAgentAuditEvent({
+      channel: "web",
+      eventType: "chat_turn_completed",
+      bantahUserId: bantahContext.userId,
+      status: "processed",
+      detail: "Web chat turn completed.",
+      metadata: {
+        messageCount: messages.length,
+        authSource: bantahContext.source,
+      },
+    });
   } catch (error) {
+    if (bantahFallbackReply && isLikelyModelAvailabilityError(error)) {
+      streamFallbackReply(res, bantahFallbackReply);
+      res.end();
+      logAgentAuditEvent({
+        channel: "web",
+        eventType: "bantah_knowledge_fallback_served",
+        bantahUserId: bantahContext.userId,
+        status: "processed",
+        detail: error instanceof Error ? error.message : "Model unavailable; served Bantah fallback.",
+        metadata: {
+          reason: "model_unavailable",
+          authSource: bantahContext.source,
+        },
+      });
+      return;
+    }
+
     sendEvent(res, {
       type: "error",
       message: error instanceof Error ? error.message : "Chat request failed",
     });
+    logAgentAuditEvent({
+      channel: "web",
+      eventType: "chat_turn_failed",
+      bantahUserId: bantahContext.userId,
+      status: "failed",
+      detail: error instanceof Error ? error.message : "Chat request failed",
+      metadata: {
+        messageCount: messages.length,
+        authSource: bantahContext.source,
+      },
+    });
   } finally {
     res.end();
   }
+}
+
+async function handleSessionRequest(
+  req: IncomingMessage,
+  url: URL,
+  res: ServerResponse,
+): Promise<void> {
+  const bantahContext = await resolveBantahUserContext({
+    headers: req.headers,
+    queryBantahUserId: url.searchParams.get("bantahUserId")?.trim() || undefined,
+  });
+
+  const twitterLinks = bantahContext.userId
+    ? listSocialIdentityLinksForBantahUser("twitter", bantahContext.userId)
+    : [];
+
+  writeJson(res, 200, {
+    authenticated: bantahContext.isAuthenticated,
+    bantahSession: bantahContext,
+    linkedChannels: {
+      twitter: twitterLinks,
+    },
+  });
+}
+
+async function handleTwitterLinkListRequest(
+  req: IncomingMessage,
+  url: URL,
+  res: ServerResponse,
+): Promise<void> {
+  const bantahContext = await resolveBantahUserContext({
+    headers: req.headers,
+    queryBantahUserId: url.searchParams.get("bantahUserId")?.trim() || undefined,
+  });
+
+  if (!bantahContext.userId) {
+    writeJson(res, 401, { error: "Bantah sign-in required before listing Twitter links." });
+    return;
+  }
+
+  writeJson(res, 200, {
+    linkedChannels: {
+      twitter: listSocialIdentityLinksForBantahUser("twitter", bantahContext.userId),
+    },
+  });
+}
+
+async function handleTwitterLinkRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
+  const body = (await readJsonBody(req)) as ChatRequestBody & TwitterLinkRequestBody;
+  const bantahContext = await resolveBantahUserContext({
+    headers: req.headers,
+    bodyBantahUserId: typeof body.bantahUserId === "string" ? body.bantahUserId.trim() : undefined,
+  });
+
+  if (!bantahContext.userId) {
+    writeJson(res, 401, { error: "Bantah sign-in required before linking Twitter." });
+    return;
+  }
+
+  const twitterUserId = String(body.twitterUserId || "").trim();
+  const twitterUsername = String(body.twitterUsername || "").trim();
+
+  if (!twitterUserId && !twitterUsername) {
+    writeJson(res, 400, {
+      error: "Provide twitterUserId or twitterUsername to link the account.",
+    });
+    return;
+  }
+
+  const link = upsertSocialIdentityLink({
+    channel: "twitter",
+    externalUserId: twitterUserId || twitterUsername.toLowerCase(),
+    externalUsername: twitterUsername || null,
+    bantahUserId: bantahContext.userId,
+    bantahUsername: bantahContext.username,
+    walletAddress: bantahContext.walletAddress,
+    metadata: {
+      linkedFrom: "agent-web",
+      authSource: bantahContext.source,
+    },
+  });
+
+  logAgentAuditEvent({
+    channel: "web",
+    eventType: "twitter_identity_linked",
+    bantahUserId: bantahContext.userId,
+    externalUserId: link.externalUserId,
+    externalUsername: link.externalUsername,
+    status: "processed",
+    detail: `Linked Twitter identity ${link.externalUsername || link.externalUserId}.`,
+  });
+
+  writeJson(res, 200, {
+    success: true,
+    link,
+  });
 }
 
 /**
@@ -247,6 +592,16 @@ function sanitizeMessages(messages: ChatRequestBody["messages"]): ExampleMessage
  */
 function sendEvent(res: ServerResponse, event: StreamEvent): void {
   res.write(`${JSON.stringify(event)}\n`);
+}
+
+function streamFallbackReply(res: ServerResponse, reply: string): void {
+  sendEvent(res, { type: "text-delta", delta: reply });
+  sendEvent(res, { type: "done", text: reply });
+}
+
+function writeJson(res: ServerResponse, statusCode: number, payload: unknown): void {
+  res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(payload));
 }
 
 if (require.main === module) {

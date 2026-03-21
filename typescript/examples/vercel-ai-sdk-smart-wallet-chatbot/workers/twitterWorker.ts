@@ -1,9 +1,19 @@
 import * as dotenv from "dotenv";
-import * as fs from "fs";
-import * as path from "path";
 import { generateText } from "ai";
-import { createExampleAgent, formatToolOutput } from "../lib/agent";
-import { buildTwitterWorkerSkillsPrompt } from "../lib/skills";
+import { createExampleAgent, formatToolOutput, type ExampleAgent } from "../lib/agent";
+import {
+  getBantahKnowledgeFallbackReply,
+  isLikelyModelAvailabilityError,
+} from "../lib/bantahKnowledgeFallback";
+import { buildTwitterWorkerSkillsPrompt, getBantABroWebUrl } from "../lib/skills";
+import {
+  getSocialIdentityLinkByExternalUser,
+  getSocialIdentityLinkByUsername,
+  hasProcessedTwitterMention,
+  logAgentAuditEvent,
+  markTwitterMentionProcessed,
+  type SocialIdentityLink,
+} from "../lib/persistence";
 import {
   getMentions,
   replyToTweet,
@@ -14,41 +24,21 @@ import {
 dotenv.config();
 
 const POLL_INTERVAL_MS = 15_000;
-const STATE_FILE = path.resolve(__dirname, "..", "twitter_worker_state.json");
+const agentCache = new Map<string, Promise<ExampleAgent>>();
 
-type WorkerState = {
-  processedTweetIds: string[];
-};
-
-/**
- * Load processed mention IDs from disk.
- *
- * @returns Set of processed mention IDs
- */
-function loadState(): Set<string> {
-  if (!fs.existsSync(STATE_FILE)) {
-    return new Set<string>();
+async function getReplyAgent(bantahUserId?: string | null): Promise<ExampleAgent> {
+  const cacheKey = String(bantahUserId || "").trim() || "public";
+  if (!agentCache.has(cacheKey)) {
+    const nextAgent = createExampleAgent(
+      bantahUserId ? { bantahActingAsUserId: bantahUserId } : {},
+    ).catch(error => {
+      agentCache.delete(cacheKey);
+      throw error;
+    });
+    agentCache.set(cacheKey, nextAgent);
   }
 
-  try {
-    const state = JSON.parse(fs.readFileSync(STATE_FILE, "utf8")) as WorkerState;
-    return new Set(state.processedTweetIds ?? []);
-  } catch (error) {
-    console.error("Failed to read worker state, starting with empty memory:", error);
-    return new Set<string>();
-  }
-}
-
-/**
- * Persist processed mention IDs to disk.
- *
- * @param processedTweetIds - Mention IDs that have already been handled
- */
-function saveState(processedTweetIds: Set<string>): void {
-  fs.writeFileSync(
-    STATE_FILE,
-    JSON.stringify({ processedTweetIds: [...processedTweetIds] }, null, 2),
-  );
+  return agentCache.get(cacheKey)!;
 }
 
 /**
@@ -79,31 +69,66 @@ function sortMentionsOldestFirst(mentions: TwitterMention[]): TwitterMention[] {
   });
 }
 
+function resolveLinkedIdentity(mention: TwitterMention): SocialIdentityLink | null {
+  if (mention.authorId) {
+    const linkedByUserId = getSocialIdentityLinkByExternalUser("twitter", mention.authorId);
+    if (linkedByUserId) {
+      return linkedByUserId;
+    }
+  }
+
+  if (mention.authorUsername) {
+    const linkedByUsername = getSocialIdentityLinkByUsername("twitter", mention.authorUsername);
+    if (linkedByUsername) {
+      return linkedByUsername;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Generate a draft reply for a mention using the shared agent.
  *
  * @param agent - Shared agent configuration
  * @param mention - Mention that needs a reply
+ * @param linkedIdentity - Linked Bantah identity when the author is known
  * @returns Draft reply text
  */
 async function generateReply(
-  agent: Awaited<ReturnType<typeof createExampleAgent>>,
+  agent: ExampleAgent,
   mention: TwitterMention,
+  linkedIdentity: SocialIdentityLink | null,
 ) {
-  const result = await generateText({
-    model: agent.model,
-    system: `${agent.system}
+  const linkedContextPrompt = linkedIdentity
+    ? `This mention author is linked to Bantah user ${linkedIdentity.bantahUserId}${linkedIdentity.bantahUsername ? ` (@${linkedIdentity.bantahUsername})` : ""}.
+You may use protected Bantah tools for this linked user when the action is safe to perform from a mention and does not require a fresh wallet signature, escrow transaction hash, missing OTP, or missing sensitive confirmation.
+If the action still needs wallet confirmation, tx hashes, or a fuller UI, redirect the user to ${getBantABroWebUrl()}.`
+    : `This mention author is not linked to a Bantah account in the agent. Treat them as a public user only and redirect protected Bantah actions to ${getBantABroWebUrl()}.`;
+
+  try {
+    const result = await generateText({
+      model: agent.model,
+      system: `${agent.system}
 You are generating a reply to a Twitter mention for a background worker.
 Return only the reply text that should be posted. Do not wrap it in quotes.
 Do not mention tool names. Do not say that you are an AI assistant.
 Do not call Twitter posting tools yourself; the worker will send the reply after you draft it.
-${buildTwitterWorkerSkillsPrompt()}`,
-    tools: agent.walletTools,
+Do not imply that a protected Bantah or wallet action has already been completed from a public mention unless a tool actually confirmed it.
+${buildTwitterWorkerSkillsPrompt({
+  hasLinkedBantahUserContext: Boolean(linkedIdentity?.bantahUserId),
+})}
+${linkedContextPrompt}`,
+    tools: agent.twitterReplyTools,
     stopWhen: agent.stopWhen,
     messages: [
       {
         role: "user",
-        content: `Draft a concise reply to this mention. Mention ID: ${mention.id}\nMention text: ${mention.text}`,
+        content: `Draft a concise reply to this mention.
+Mention ID: ${mention.id}
+Mention text: ${mention.text}
+Mention author id: ${mention.authorId || "unknown"}
+Mention author username: ${mention.authorUsername || "unknown"}`,
       },
     ],
     onStepFinish: async ({ toolResults }) => {
@@ -111,9 +136,26 @@ ${buildTwitterWorkerSkillsPrompt()}`,
         console.log(`Tool ${tr.toolName}: ${formatToolOutput(tr.output)}`);
       }
     },
-  });
+    });
 
-  return result.text.trim();
+    return result.text.trim();
+  } catch (error) {
+    if (isLikelyModelAvailabilityError(error)) {
+      const fallback = getBantahKnowledgeFallbackReply(
+        [{ role: "user", content: mention.text }],
+        {
+          bantahAuthenticated: Boolean(linkedIdentity?.bantahUserId),
+          bantahUsername: linkedIdentity?.bantahUsername || null,
+          channel: "twitter",
+        },
+      );
+      if (fallback) {
+        return fallback;
+      }
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -124,17 +166,23 @@ ${buildTwitterWorkerSkillsPrompt()}`,
 async function processMentions() {
   validateTwitterEnvironment();
 
-  const agent = await createExampleAgent();
-  const processedTweetIds = loadState();
+  const publicAgent = await getReplyAgent();
 
   console.log("Twitter worker started. Polling every 15 seconds.");
+  if (Object.keys(publicAgent.twitterReplyTools).length > 0) {
+    console.log(
+      "Twitter reply tools enabled. Public Bantah reads are available, and linked Bantah users can access protected Bantah tools when safe.",
+    );
+  } else {
+    console.log("Twitter reply Bantah tools disabled. Public Bantah reads will not be available.");
+  }
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
       const { account, mentions } = await getMentions();
       const newMentions = sortMentionsOldestFirst(
-        mentions.filter(mention => mention.id && !processedTweetIds.has(mention.id)),
+        mentions.filter(mention => mention.id && !hasProcessedTwitterMention(mention.id)),
       );
 
       if (newMentions.length > 0) {
@@ -143,19 +191,63 @@ async function processMentions() {
 
       for (const mention of newMentions) {
         console.log(`New mention ${mention.id}: ${mention.text}`);
+        const linkedIdentity = resolveLinkedIdentity(mention);
+
+        if (linkedIdentity) {
+          console.log(
+            `Linked Bantah identity found for mention ${mention.id}: ${linkedIdentity.bantahUserId}`,
+          );
+        }
 
         try {
-          const replyText = await generateReply(agent, mention);
+          const agent = await getReplyAgent(linkedIdentity?.bantahUserId);
+          const replyText = await generateReply(agent, mention, linkedIdentity);
           if (!replyText) {
             throw new Error("Generated reply was empty.");
           }
 
           const replyResult = await replyToTweet(mention.id, replyText);
-          processedTweetIds.add(mention.id);
-          saveState(processedTweetIds);
+          const replyTweetId =
+            replyResult && typeof replyResult === "object" && "id" in replyResult
+              ? String((replyResult as { id?: unknown }).id || "")
+              : null;
+
+          markTwitterMentionProcessed({
+            tweetId: mention.id,
+            authorId: mention.authorId || null,
+            authorUsername: mention.authorUsername || null,
+            replyTweetId,
+          });
+          logAgentAuditEvent({
+            channel: "twitter",
+            eventType: "mention_replied",
+            bantahUserId: linkedIdentity?.bantahUserId || null,
+            externalUserId: mention.authorId || null,
+            externalUsername: mention.authorUsername || null,
+            status: "processed",
+            detail: `Mention ${mention.id} replied successfully.`,
+            metadata: {
+              mentionId: mention.id,
+              conversationId: mention.conversationId || null,
+              linkedBantahUserId: linkedIdentity?.bantahUserId || null,
+            },
+          });
 
           console.log(`Reply sent for mention ${mention.id}: ${formatToolOutput(replyResult)}`);
         } catch (error) {
+          logAgentAuditEvent({
+            channel: "twitter",
+            eventType: "mention_reply_failed",
+            bantahUserId: linkedIdentity?.bantahUserId || null,
+            externalUserId: mention.authorId || null,
+            externalUsername: mention.authorUsername || null,
+            status: "failed",
+            detail: error instanceof Error ? error.message : "Unknown Twitter worker failure",
+            metadata: {
+              mentionId: mention.id,
+              conversationId: mention.conversationId || null,
+            },
+          });
           console.error(`Failed to process mention ${mention.id}:`, error);
         }
       }

@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.0",
-    "@coinbase/agentkit": "workspace:*",
+    "@coinbase/agentkit": "^0.10.4",
     "ai": "^6.0.0",
     "awal": "2.2.0",
     "dotenv": "^16.4.5",

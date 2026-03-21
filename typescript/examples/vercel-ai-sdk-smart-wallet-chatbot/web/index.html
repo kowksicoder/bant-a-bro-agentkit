@@ -1471,6 +1471,17 @@
   </main>
 
   <script>
+      const bootstrap = window.__BANTABRO_BOOTSTRAP__ || {};
+      const bantahSession = bootstrap.bantahSession && typeof bootstrap.bantahSession === "object"
+        ? bootstrap.bantahSession
+        : {};
+      const bantahUserId = typeof bantahSession.userId === "string" && bantahSession.userId.trim()
+        ? bantahSession.userId.trim()
+        : (typeof bootstrap.bantahUserId === "string" ? bootstrap.bantahUserId.trim() : "");
+      const bantahUsername = typeof bantahSession.username === "string"
+        ? bantahSession.username.trim()
+        : "";
+      const bantahAuthenticated = Boolean(bantahSession.isAuthenticated && bantahUserId);
       const messagesContainer = document.getElementById("messages");
       const chatForm = document.getElementById("chatForm");
       const promptInput = document.getElementById("promptInput");
@@ -1684,8 +1695,12 @@
           </article>
         `;
       setToolPlaceholder("Tool activity will appear here during a turn.");
-      statusText.textContent = "Waiting for first message.";
-      twitterStatus.textContent = "Twitter status will appear after the first request.";
+      statusText.textContent = bantahAuthenticated
+        ? `Waiting for first message. Bantah linked${bantahUsername ? ` as @${bantahUsername}` : ""}.`
+        : "Waiting for first message. Guest mode until Bantah sign-in is detected.";
+      twitterStatus.textContent = bantahAuthenticated
+        ? `Twitter status will appear after the first request. Bantah user: ${bantahUserId}`
+        : "Twitter status will appear after the first request. Protected Bantah actions need sign-in.";
       syncEmptyState();
       updateHistory();
       promptInput.value = "";
@@ -1715,7 +1730,11 @@
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ messages }),
+          credentials: "same-origin",
+          body: JSON.stringify({
+            messages,
+            bantahUserId: bantahUserId || undefined,
+          }),
         });
 
         if (!response.ok || !response.body) {
@@ -1748,6 +1767,9 @@
               twitterStatus.textContent = event.twitterEnabled
                 ? "Twitter tools are enabled for this session."
                 : "Twitter tools are disabled until the Twitter env vars are configured.";
+              statusText.textContent = event.bantahAuthenticated
+                ? `Streaming response for Bantah user${event.bantahUsername ? ` @${event.bantahUsername}` : ""}...`
+                : "Streaming response in guest mode...";
             }
 
             if (event.type === "text-delta") {
