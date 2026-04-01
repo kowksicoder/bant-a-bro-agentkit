@@ -27,7 +27,7 @@ dotenv.config();
 
 const POLL_INTERVAL_MS = Math.max(
   5_000,
-  Number(process.env.TWITTER_POLL_INTERVAL_MS || "30000"),
+  Number(process.env.TWITTER_POLL_INTERVAL_MS || "5000"),
 );
 const agentCache = new Map<string, Promise<ExampleAgent>>();
 
