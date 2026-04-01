@@ -19,6 +19,7 @@ Current supported direction:
 
 - Bantah informational answers
 - public-safe Bantah challenge lookup
+- public Bantah leaderboard lookup
 - onchain-first Bantah challenge guidance
 - signed-in web users completing supported Bantah challenge flows
 - linked social users getting safer contextual responses where implemented

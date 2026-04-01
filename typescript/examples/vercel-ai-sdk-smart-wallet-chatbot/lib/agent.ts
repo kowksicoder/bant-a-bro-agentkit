@@ -31,11 +31,15 @@ import {
   createBantahChallenge,
   getBantahChallengeMessages,
   getBantahChallengeProofs,
+  getBantahLeaderboard,
   getBantahAvailability,
   getBantahChallenge,
   getBantahOnchainWalletBalance,
+  getBantahTopUser,
   getBantahPublicAvailability,
   getPublicBantahChallenge,
+  getPublicBantahLeaderboard,
+  getPublicBantahTopUser,
   joinBantahChallenge,
   listBantahChallenges,
   listPublicBantahChallenges,
@@ -248,6 +252,7 @@ async function createExampleAgentInternal(
   const tools: ToolSet = {
     ...walletTools,
     ...agenticWalletTools,
+    ...(bantahPublicAvailability.enabled ? createPublicBantahTools() : {}),
     ...(bantahEnabled ? createBantahTools(actingAsUserId || undefined) : {}),
     ...(twitterEnabled ? createTwitterTools() : {}),
   };
@@ -283,6 +288,7 @@ async function createExampleAgentInternal(
       twitterEnabled,
       bantahEnabled,
       bantahUserContextAvailable,
+      bantahPublicEnabled: bantahPublicAvailability.enabled,
     }),
     stopWhen: stepCountIs(10),
     tools,
@@ -388,7 +394,7 @@ function createTwitterTools(): ToolSet {
  *
  * @returns Bantah public-read tools for social reply generation
  */
-function createTwitterBantahTools(): ToolSet {
+function createPublicBantahTools(): ToolSet {
   return {
     bantah_public_list_challenges: tool({
       description:
@@ -419,6 +425,37 @@ function createTwitterBantahTools(): ToolSet {
         result: await getPublicBantahChallenge({ target, challengeId }),
       }),
     }),
+    bantah_public_get_leaderboard: tool({
+      description:
+        "Fetch the public Bantah leaderboard. Use this when the user asks who is leading Bantah or asks for top-ranked users.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .max(100)
+          .optional()
+          .describe("Optional maximum number of leaderboard entries to return."),
+      }),
+      execute: async ({ target, limit }) => ({
+        success: true,
+        action: "bantah_public_get_leaderboard",
+        result: await getPublicBantahLeaderboard({ target, limit }),
+      }),
+    }),
+    bantah_public_get_top_user: tool({
+      description:
+        "Fetch the current leading Bantah user from the public leaderboard.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+      }),
+      execute: async ({ target }) => ({
+        success: true,
+        action: "bantah_public_get_top_user",
+        result: await getPublicBantahTopUser({ target }),
+      }),
+    }),
   };
 }
 
@@ -430,7 +467,7 @@ function createTwitterReplyTools(options: {
   const tools: ToolSet = {};
 
   if (options.bantahPublicEnabled) {
-    Object.assign(tools, createTwitterBantahTools());
+    Object.assign(tools, createPublicBantahTools());
   }
 
   if (options.bantahEnabled && options.bantahActingAsUserId) {
@@ -474,6 +511,37 @@ function createBantahTools(actingAsUserId?: string): ToolSet {
         success: true,
         action: "bantah_get_challenge",
         result: await getBantahChallenge({ target, challengeId, actingAsUserId }),
+      }),
+    }),
+    bantah_get_leaderboard: tool({
+      description:
+        "Fetch the Bantah leaderboard. Use this when the user asks for rankings, top users, or who is leading Bantah right now.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .max(100)
+          .optional()
+          .describe("Optional maximum number of leaderboard entries to return."),
+      }),
+      execute: async ({ target, limit }) => ({
+        success: true,
+        action: "bantah_get_leaderboard",
+        result: await getBantahLeaderboard({ target, limit, actingAsUserId }),
+      }),
+    }),
+    bantah_get_top_user: tool({
+      description:
+        "Fetch the current leading Bantah user from the leaderboard.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+      }),
+      execute: async ({ target }) => ({
+        success: true,
+        action: "bantah_get_top_user",
+        result: await getBantahTopUser({ target, actingAsUserId }),
       }),
     }),
     bantah_create_challenge: tool({
@@ -815,6 +883,7 @@ function createSystemPrompt(options: {
   twitterEnabled: boolean;
   bantahEnabled: boolean;
   bantahUserContextAvailable: boolean;
+  bantahPublicEnabled: boolean;
 }): string {
   const faucetMessage = options.canUseFaucet
     ? "If you ever need funds, you can request them from the faucet."
@@ -841,6 +910,13 @@ Use reply_to_tweet when the user asks you to answer a mention or a specific twee
 If the user says "Reply to my latest mention", call get_mentions first, choose the newest relevant mention, then call reply_to_tweet.`
     : "Twitter (X) tools are not available right now because the required Twitter credentials are missing.";
 
+  const bantahPublicMessage = options.bantahPublicEnabled
+    ? `You also have public Bantah read tools.
+Use bantah_public_list_challenges and bantah_public_get_challenge for public challenge discovery.
+Use bantah_public_get_leaderboard when the user asks for the leaderboard, rankings, or top Bantah users.
+Use bantah_public_get_top_user when the user asks who is currently leading Bantah.`
+    : "Public Bantah read tools are not available right now.";
+
   const bantahMessage = !options.bantahUserContextAvailable
     ? `Bantah protected challenge actions require a real Bantah account and active sign-in context.
 If a user wants to create, accept, join, prove, vote, or settle a Bantah challenge and you do not have confirmed Bantah user context for them, tell them to create an account or sign in first at https://onchain.bantah.fun, then continue there.
@@ -851,6 +927,7 @@ In the current build, Bantah challenge flows are onchain-only.
 Do not route users into offchain Bantah challenge creation or participation from this agent.
 Use bantah_list_challenges to inspect current onchain Bantah challenges.
 Use bantah_get_challenge to retrieve a specific onchain Bantah challenge by id.
+Use bantah_get_leaderboard to inspect Bantah rankings and bantah_get_top_user for the current leading user.
 Use bantah_create_challenge to create an onchain Bantah challenge when the user clearly wants to create one.
 Use bantah_accept_challenge when the user clearly wants to accept an onchain Bantah challenge.
 Use bantah_join_challenge for admin-created onchain YES/NO challenges that require picking a side.
@@ -870,6 +947,7 @@ ${skillsMessage}
 ${knowledgeMessage}
 ${agenticWalletMessage}
 ${twitterMessage}
+${bantahPublicMessage}
 ${bantahMessage}
 If there is a 5XX (internal) HTTP error code, ask the user to try again later.
 If someone asks you to do something you can't do with your currently available tools, you must say so, and

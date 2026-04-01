@@ -65,6 +65,11 @@ export type BantahChallengeMessageInput = {
   evidence?: unknown;
 };
 
+export type BantahLeaderboardQuery = {
+  target?: BantahTarget;
+  limit?: number;
+};
+
 type AgentTokenPayload = {
   v: 1;
   sub: string;
@@ -368,6 +373,32 @@ function getErrorMessage(value: unknown): string | null {
   return null;
 }
 
+function clampLeaderboardLimit(limit?: number): number | undefined {
+  if (!Number.isFinite(limit)) {
+    return undefined;
+  }
+
+  const normalized = Math.trunc(Number(limit));
+  if (normalized <= 0) {
+    return undefined;
+  }
+
+  return Math.min(normalized, 100);
+}
+
+function trimLeaderboardResult(result: unknown, limit?: number): unknown {
+  const normalizedLimit = clampLeaderboardLimit(limit);
+  if (!normalizedLimit) {
+    return result;
+  }
+
+  if (Array.isArray(result)) {
+    return result.slice(0, normalizedLimit);
+  }
+
+  return result;
+}
+
 export function getBantahAvailability(actingAsUserIdOverride?: string): BantahAvailability {
   const missingGlobalVars = [
     ["BANTAH_AGENT_TOKEN_SECRET", getAgentTokenSecret()],
@@ -420,6 +451,32 @@ export async function getPublicBantahChallenge(options: {
   return bantahPublicFetch(target, `/api/challenges/${options.challengeId}`);
 }
 
+export async function getPublicBantahLeaderboard(
+  options: BantahLeaderboardQuery = {},
+): Promise<unknown> {
+  const target = resolveTarget(options.target, {
+    preferOnchain: getBantahChallengeMode() === "onchain_only",
+  });
+  const leaderboard = await bantahPublicFetch(target, "/api/leaderboard");
+
+  return trimLeaderboardResult(leaderboard, options.limit);
+}
+
+export async function getPublicBantahTopUser(
+  options: Pick<BantahLeaderboardQuery, "target"> = {},
+): Promise<unknown> {
+  const leaderboard = await getPublicBantahLeaderboard({
+    target: options.target,
+    limit: 1,
+  });
+
+  if (Array.isArray(leaderboard)) {
+    return leaderboard[0] ?? null;
+  }
+
+  return leaderboard;
+}
+
 export async function listBantahChallenges(options: {
   target?: BantahTarget;
   feed?: string;
@@ -445,6 +502,18 @@ export async function getBantahChallenge(options: {
     scopes: ["challenges:read"],
     actingAsUserId: options.actingAsUserId,
   });
+}
+
+export async function getBantahLeaderboard(
+  options: BantahLeaderboardQuery & { actingAsUserId?: string } = {},
+): Promise<unknown> {
+  return getPublicBantahLeaderboard(options);
+}
+
+export async function getBantahTopUser(
+  options: Pick<BantahLeaderboardQuery, "target"> & { actingAsUserId?: string } = {},
+): Promise<unknown> {
+  return getPublicBantahTopUser(options);
 }
 
 export async function createBantahChallenge(
