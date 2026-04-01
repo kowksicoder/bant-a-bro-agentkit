@@ -38,10 +38,14 @@ import {
   getBantahTopUser,
   getBantahPublicAvailability,
   getPublicBantahChallenge,
+  getPublicBantahChallengeMessages,
+  getPublicBantahOnchainConfig,
+  getPublicBantahOnchainStatus,
   getPublicBantahLeaderboard,
   getPublicBantahTopUser,
   joinBantahChallenge,
   listBantahChallenges,
+  listPublicBantahAdminChallenges,
   listPublicBantahChallenges,
   postBantahChallengeMessage,
   submitBantahChallengeProof,
@@ -412,6 +416,18 @@ function createPublicBantahTools(): ToolSet {
         result: await listPublicBantahChallenges({ target, feed }),
       }),
     }),
+    bantah_public_list_admin_challenges: tool({
+      description:
+        "List public admin-created Bantah challenges. Use this when the user asks for open market-style public challenges.",
+      inputSchema: z.object({
+        target: z.enum(["offchain", "onchain"]).optional().describe("Which Bantah surface to query."),
+      }),
+      execute: async ({ target }) => ({
+        success: true,
+        action: "bantah_public_list_admin_challenges",
+        result: await listPublicBantahAdminChallenges({ target }),
+      }),
+    }),
     bantah_public_get_challenge: tool({
       description:
         "Fetch public Bantah challenge details by id for a social reply.",
@@ -423,6 +439,18 @@ function createPublicBantahTools(): ToolSet {
         success: true,
         action: "bantah_public_get_challenge",
         result: await getPublicBantahChallenge({ target, challengeId }),
+      }),
+    }),
+    bantah_public_get_challenge_messages: tool({
+      description:
+        "Fetch public Bantah challenge messages for admin-created onchain challenges where public discussion is allowed.",
+      inputSchema: z.object({
+        challengeId: z.number().int().positive().describe("The Bantah challenge id."),
+      }),
+      execute: async ({ challengeId }) => ({
+        success: true,
+        action: "bantah_public_get_challenge_messages",
+        result: await getPublicBantahChallengeMessages({ challengeId }),
       }),
     }),
     bantah_public_get_leaderboard: tool({
@@ -454,6 +482,26 @@ function createPublicBantahTools(): ToolSet {
         success: true,
         action: "bantah_public_get_top_user",
         result: await getPublicBantahTopUser({ target }),
+      }),
+    }),
+    bantah_public_get_onchain_config: tool({
+      description:
+        "Fetch public Bantah onchain configuration, including supported chains and default token settings.",
+      inputSchema: z.object({}),
+      execute: async () => ({
+        success: true,
+        action: "bantah_public_get_onchain_config",
+        result: await getPublicBantahOnchainConfig(),
+      }),
+    }),
+    bantah_public_get_onchain_status: tool({
+      description:
+        "Fetch public Bantah onchain runtime status, including wallet enforcement and configured token support.",
+      inputSchema: z.object({}),
+      execute: async () => ({
+        success: true,
+        action: "bantah_public_get_onchain_status",
+        result: await getPublicBantahOnchainStatus(),
       }),
     }),
   };
@@ -913,8 +961,12 @@ If the user says "Reply to my latest mention", call get_mentions first, choose t
   const bantahPublicMessage = options.bantahPublicEnabled
     ? `You also have public Bantah read tools.
 Use bantah_public_list_challenges and bantah_public_get_challenge for public challenge discovery.
+Use bantah_public_list_admin_challenges when the user wants public admin-created market challenges.
+Use bantah_public_get_challenge_messages for public discussion on admin-created onchain challenges when available.
 Use bantah_public_get_leaderboard when the user asks for the leaderboard, rankings, or top Bantah users.
-Use bantah_public_get_top_user when the user asks who is currently leading Bantah.`
+Use bantah_public_get_top_user when the user asks who is currently leading Bantah.
+Use bantah_public_get_onchain_config when the user asks which chains or tokens Bantah supports.
+Use bantah_public_get_onchain_status when the user asks about Bantah onchain runtime status or wallet enforcement.`
     : "Public Bantah read tools are not available right now.";
 
   const bantahMessage = !options.bantahUserContextAvailable

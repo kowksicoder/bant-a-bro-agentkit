@@ -20,6 +20,9 @@ Current supported direction:
 - Bantah informational answers
 - public-safe Bantah challenge lookup
 - public Bantah leaderboard lookup
+- public Bantah chain/token configuration lookup
+- public Bantah runtime status lookup
+- public Bantah admin challenge discussion lookup where Bantah allows it
 - onchain-first Bantah challenge guidance
 - signed-in web users completing supported Bantah challenge flows
 - linked social users getting safer contextual responses where implemented

@@ -442,6 +442,14 @@ export async function listPublicBantahChallenges(options: {
   return bantahPublicFetch(target, `/api/challenges${query}`);
 }
 
+export async function listPublicBantahAdminChallenges(options: {
+  target?: BantahTarget;
+} = {}): Promise<unknown> {
+  const target = resolveChallengeTarget(options.target);
+
+  return bantahPublicFetch(target, "/api/challenges/public");
+}
+
 export async function getPublicBantahChallenge(options: {
   target?: BantahTarget;
   challengeId: number;
@@ -449,6 +457,12 @@ export async function getPublicBantahChallenge(options: {
   const target = resolveChallengeTarget(options.target);
 
   return bantahPublicFetch(target, `/api/challenges/${options.challengeId}`);
+}
+
+export async function getPublicBantahChallengeMessages(options: {
+  challengeId: number;
+}): Promise<unknown> {
+  return bantahPublicFetch("onchain", `/api/challenges/${options.challengeId}/messages`);
 }
 
 export async function getPublicBantahLeaderboard(
@@ -475,6 +489,14 @@ export async function getPublicBantahTopUser(
   }
 
   return leaderboard;
+}
+
+export async function getPublicBantahOnchainConfig(): Promise<unknown> {
+  return bantahPublicFetch("onchain", "/api/onchain/config");
+}
+
+export async function getPublicBantahOnchainStatus(): Promise<unknown> {
+  return bantahPublicFetch("onchain", "/api/onchain/status");
 }
 
 export async function listBantahChallenges(options: {
