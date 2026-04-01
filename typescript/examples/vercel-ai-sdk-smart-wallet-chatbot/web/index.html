@@ -1290,6 +1290,9 @@
             <button class="prompt-item" type="button" data-view="faq">
               <strong>FAQ</strong>
             </button>
+            <button class="prompt-item" type="button" data-view="skills">
+              <strong>Skills</strong>
+            </button>
           </div>
         </div>
       </section>
@@ -1394,6 +1397,43 @@
                     place where the actual flow is completed and tracked.
                   </p>
                 </article>
+              </div>
+            </article>
+
+            <article class="page-card" data-page="skills">
+              <span class="page-eyebrow">Skills</span>
+              <h2>Public Bantah skills available to third-party agents.</h2>
+              <p class="page-lead">
+                These are public read endpoints that any agent can call safely without Bantah sign-in. Protected
+                actions (create, accept, vote, settle) still require Bantah auth and should not be exposed publicly.
+              </p>
+              <div class="page-section">
+                <h3>Challenge Discovery</h3>
+                <ul class="page-list">
+                  <li><code>GET /api/challenges</code> — public feed (use <code>feed=all</code>).</li>
+                  <li><code>GET /api/challenges/public</code> — admin-created public challenges.</li>
+                  <li><code>GET /api/challenges/:id</code> — public challenge detail.</li>
+                  <li><code>GET /api/challenges/:id/messages</code> — public messages for admin-created onchain challenges.</li>
+                </ul>
+              </div>
+              <div class="page-section">
+                <h3>Leaderboard</h3>
+                <ul class="page-list">
+                  <li><code>GET /api/leaderboard</code> — global Bantah ranking.</li>
+                </ul>
+              </div>
+              <div class="page-section">
+                <h3>Onchain Status</h3>
+                <ul class="page-list">
+                  <li><code>GET /api/onchain/config</code> — supported chains and tokens.</li>
+                  <li><code>GET /api/onchain/status</code> — runtime and wallet enforcement status.</li>
+                </ul>
+              </div>
+              <div class="page-section">
+                <h3>Public Profiles</h3>
+                <ul class="page-list">
+                  <li><code>/u/:username</code> — redirects to <code>/@username</code> profile view.</li>
+                </ul>
               </div>
             </article>
           </section>
