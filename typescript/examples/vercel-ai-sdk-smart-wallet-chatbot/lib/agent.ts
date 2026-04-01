@@ -7,7 +7,7 @@ import {
   pythActionProvider,
   walletActionProvider,
 } from "@coinbase/agentkit";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI, openai } from "@ai-sdk/openai";
 import { stepCountIs, tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { type Address } from "viem";
@@ -76,15 +76,78 @@ export type ExampleAgentOptions = {
 
 let exampleAgentPromise: Promise<ExampleAgent> | null = null;
 
+function getOpenRouterApiKey(): string {
+  return String(process.env.OPENROUTER_API_KEY || "").trim();
+}
+
+function getOpenAIApiKey(): string {
+  return String(process.env.OPENAI_API_KEY || "").trim();
+}
+
+function getResolvedModelProvider():
+  | { provider: "openrouter"; apiKey: string }
+  | { provider: "openai"; apiKey: string }
+  | null {
+  const openRouterApiKey = getOpenRouterApiKey();
+  if (openRouterApiKey) {
+    return { provider: "openrouter", apiKey: openRouterApiKey };
+  }
+
+  const openAIApiKey = getOpenAIApiKey();
+  if (!openAIApiKey) {
+    return null;
+  }
+
+  if (openAIApiKey.startsWith("sk-or-")) {
+    return { provider: "openrouter", apiKey: openAIApiKey };
+  }
+
+  return { provider: "openai", apiKey: openAIApiKey };
+}
+
+function hasModelCredentials(): boolean {
+  return Boolean(getResolvedModelProvider());
+}
+
+function getConfiguredModel() {
+  const providerConfig = getResolvedModelProvider();
+  if (!providerConfig) {
+    throw new Error("OPENROUTER_API_KEY or OPENAI_API_KEY must be configured.");
+  }
+
+  if (providerConfig.provider === "openrouter") {
+    const provider = createOpenAI({
+      apiKey: providerConfig.apiKey,
+      baseURL: String(process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").trim(),
+      headers: {
+        "HTTP-Referer": String(
+          process.env.OPENROUTER_HTTP_REFERER ||
+            process.env.BANT_A_BRO_WEB_URL ||
+            "https://onchain.bantah.fun",
+        ).trim(),
+        "X-Title": String(process.env.OPENROUTER_TITLE || "Bant-A-Bro").trim(),
+      },
+    });
+
+    return provider.chat(
+      String(process.env.OPENROUTER_MODEL || process.env.OPENAI_MODEL || "openai/gpt-4o-mini").trim(),
+    );
+  }
+
+  return openai.chat(String(process.env.OPENAI_MODEL || "gpt-4o-mini").trim());
+}
+
 /**
  * Validate required environment variables for the base wallet chatbot.
  *
  * @throws Error if required environment variables are missing
  */
 export function validateEnvironment(): void {
-  const missingVars = ["OPENAI_API_KEY", "CDP_API_KEY_ID", "CDP_API_KEY_SECRET"].filter(
-    varName => !process.env[varName],
-  );
+  const missingVars = ["CDP_API_KEY_ID", "CDP_API_KEY_SECRET"].filter(varName => !process.env[varName]);
+
+  if (!hasModelCredentials()) {
+    missingVars.unshift("OPENROUTER_API_KEY or OPENAI_API_KEY");
+  }
 
   if (missingVars.length > 0) {
     throw new Error(`Required environment variables are not set: ${missingVars.join(", ")}`);
@@ -214,7 +277,7 @@ async function createExampleAgentInternal(
   }
 
   return {
-    model: openai.chat("gpt-4o-mini"),
+    model: getConfiguredModel(),
     system: createSystemPrompt({
       canUseFaucet: walletProvider.getNetwork().networkId === "base-sepolia",
       twitterEnabled,

@@ -154,7 +154,7 @@ nvm install node
 You will need:
 
 - [CDP API Key](https://portal.cdp.coinbase.com/access/api)
-- [OpenAI API Key](https://platform.openai.com/docs/quickstart#create-and-export-an-api-key)
+- [OpenRouter API Key](https://openrouter.ai/)
 - [Twitter (X) Developer credentials](https://developer.x.com/en/portal/dashboard)
 
 Rename `.env-local` to `.env` and fill in:
@@ -162,7 +162,11 @@ Rename `.env-local` to `.env` and fill in:
 - `CDP_API_KEY_ID`
 - `CDP_API_KEY_SECRET`
 - `CDP_WALLET_SECRET`
-- `OPENAI_API_KEY`
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL` optional, defaults to `openai/gpt-4o-mini`
+- `OPENROUTER_BASE_URL` optional, defaults to `https://openrouter.ai/api/v1`
+- `OPENROUTER_HTTP_REFERER` optional, defaults to your Bant-A-Bro web URL
+- `OPENROUTER_TITLE` optional, defaults to `Bant-A-Bro`
 - `TWITTER_API_KEY`
 - `TWITTER_API_SECRET`
 - `TWITTER_ACCESS_TOKEN`
@@ -305,7 +309,11 @@ Recommended Railway setup:
 5. Mount a persistent volume at `/data` if you want SQLite state to survive restarts.
    - This is where `BANTABRO_DB_PATH=/data/bantabro.sqlite` points.
 6. Use the same core env vars on both services:
-   - `OPENAI_API_KEY`
+   - `OPENROUTER_API_KEY`
+   - `OPENROUTER_MODEL`
+   - `OPENROUTER_BASE_URL`
+   - `OPENROUTER_HTTP_REFERER`
+   - `OPENROUTER_TITLE`
    - `CDP_API_KEY_ID`
    - `CDP_API_KEY_SECRET`
    - `CDP_WALLET_SECRET`

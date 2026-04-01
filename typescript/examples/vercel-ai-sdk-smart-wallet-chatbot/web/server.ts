@@ -238,7 +238,7 @@ async function handleChatRequest(req: IncomingMessage, res: ServerResponse): Pro
     channel: "web",
   });
   const shouldAttemptKnowledgeOnly =
-    (!String(process.env.OPENAI_API_KEY || "").trim() ||
+    (!String(process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY || "").trim() ||
       String(process.env.BANTABRO_FORCE_KNOWLEDGEBASE_MODE || "").trim() === "true") &&
     Boolean(bantahFallbackReply);
   const knowledgeOnlyMode = String(process.env.BANTABRO_FORCE_KNOWLEDGEBASE_MODE || "").trim() === "true";
