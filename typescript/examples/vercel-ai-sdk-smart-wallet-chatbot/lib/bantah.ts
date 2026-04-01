@@ -82,6 +82,9 @@ const DEFAULT_OFFCHAIN_AUDIENCE = "bantah-offchain";
 const DEFAULT_ONCHAIN_AUDIENCE = "bantah-onchain";
 const DEFAULT_TOKEN_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_CHALLENGE_MODE: BantahChallengeMode = "onchain_only";
+const MAX_AGENT_STRING_LENGTH = 500;
+const MAX_AGENT_ARRAY_LENGTH = 25;
+const MAX_AGENT_DEPTH = 6;
 
 function toBase64Url(input: Buffer | string): string {
   const raw = Buffer.isBuffer(input)
@@ -203,6 +206,48 @@ function signPayload(payloadEncoded: string, secret: string): string {
   return toBase64Url(signature);
 }
 
+function sanitizeForAgent(value: unknown, depth = 0): unknown {
+  if (value == null) {
+    return value;
+  }
+
+  if (depth > MAX_AGENT_DEPTH) {
+    return "[omitted]";
+  }
+
+  if (typeof value === "string") {
+    if (value.startsWith("data:")) {
+      return "[omitted data uri]";
+    }
+
+    return value.length > MAX_AGENT_STRING_LENGTH
+      ? `${value.slice(0, MAX_AGENT_STRING_LENGTH)}…`
+      : value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, MAX_AGENT_ARRAY_LENGTH).map(item => sanitizeForAgent(item, depth + 1));
+  }
+
+  if (typeof value === "object") {
+    const sanitizedEntries = Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => {
+      if (
+        typeof entryValue === "string" &&
+        entryValue.startsWith("data:") &&
+        /image|avatar|photo/i.test(key)
+      ) {
+        return [key, null];
+      }
+
+      return [key, sanitizeForAgent(entryValue, depth + 1)];
+    });
+
+    return Object.fromEntries(sanitizedEntries);
+  }
+
+  return value;
+}
+
 function createDelegatedAgentToken(
   target: BantahTarget,
   scopes?: string[],
@@ -268,7 +313,7 @@ async function bantahFetch<T>(
     throw new Error(message);
   }
 
-  return (parsed ?? raw) as T;
+  return sanitizeForAgent(parsed ?? raw) as T;
 }
 
 async function bantahPublicFetch<T>(
@@ -292,7 +337,7 @@ async function bantahPublicFetch<T>(
     throw new Error(message);
   }
 
-  return (parsed ?? raw) as T;
+  return sanitizeForAgent(parsed ?? raw) as T;
 }
 
 function tryParseJson(raw: string): unknown {
