@@ -3,6 +3,7 @@ FROM node:24-slim
 WORKDIR /app
 
 COPY package.json ./
+COPY scripts ./scripts
 RUN npm install --include=dev && npm cache clean --force
 
 COPY . .
