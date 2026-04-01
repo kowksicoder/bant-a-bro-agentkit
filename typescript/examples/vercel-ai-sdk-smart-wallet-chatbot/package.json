@@ -9,6 +9,8 @@
     "node": ">=24.0.0"
   },
   "scripts": {
+    "postinstall": "node ./scripts/patch-awal.mjs",
+    "patch:awal": "node ./scripts/patch-awal.mjs",
     "start": "tsx ./chatbot.ts",
     "start:web": "tsx ./web/server.ts",
     "start:worker": "tsx ./workers/twitterWorker.ts",

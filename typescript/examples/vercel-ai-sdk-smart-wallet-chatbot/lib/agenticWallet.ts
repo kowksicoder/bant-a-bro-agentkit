@@ -10,6 +10,27 @@ export const AGENTIC_WALLET_ASSETS = ["usdc", "eth", "weth", "sol"] as const;
 
 type AwalResult = Record<string, unknown> | unknown[] | string | number | boolean | null;
 
+type AwalCommand = {
+  binary: string;
+  prefixArgs: string[];
+};
+
+function getAwalEnvironment(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+
+  // Electron must run as Electron, not as a plain Node child.
+  delete env.ELECTRON_RUN_AS_NODE;
+
+  if (process.platform === "win32") {
+    const windowsTmpRoot = path.join(process.env.SystemDrive ?? "C:", "tmp");
+    if (!fs.existsSync(windowsTmpRoot)) {
+      fs.mkdirSync(windowsTmpRoot, { recursive: true });
+    }
+  }
+
+  return env;
+}
+
 /**
  * Execute the local awal CLI and return either parsed JSON or raw output.
  *
@@ -25,17 +46,21 @@ async function runAwalCommand(
 ): Promise<AwalResult> {
   const json = options.json ?? true;
   const timeoutMs = options.timeoutMs ?? 120_000;
-  const binary = resolveAwalBinary();
-  const finalArgs =
-    binary === "npx" || binary === "npx.cmd"
-      ? ["awal", ...args, ...(json ? ["--json"] : [])]
-      : [...args, ...(json ? ["--json"] : [])];
+  const command = resolveAwalCommand();
+  const finalArgs = [
+    ...command.prefixArgs,
+    ...args,
+    ...(json ? ["--json"] : []),
+  ];
 
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, finalArgs, {
+    const child = spawn(command.binary, finalArgs, {
       cwd: process.cwd(),
-      env: process.env,
+      env: getAwalEnvironment(),
       stdio: ["ignore", "pipe", "pipe"],
+      shell:
+        process.platform === "win32" &&
+        /\.(cmd|bat)$/i.test(command.binary),
     });
 
     let stdout = "";
@@ -90,11 +115,26 @@ async function runAwalCommand(
 }
 
 /**
- * Resolve the best available awal executable, preferring the local package binary.
+ * Resolve the best available awal command, preferring the local package entrypoint.
  *
- * @returns Path or command name for the awal CLI
+ * @returns Command information for the awal CLI
  */
-function resolveAwalBinary(): string {
+function resolveAwalCommand(): AwalCommand {
+  const localEntry = path.resolve(
+    process.cwd(),
+    "node_modules",
+    "awal",
+    "dist",
+    "index.js",
+  );
+
+  if (fs.existsSync(localEntry)) {
+    return {
+      binary: process.execPath,
+      prefixArgs: [localEntry],
+    };
+  }
+
   const localBinary = path.resolve(
     process.cwd(),
     "node_modules",
@@ -103,10 +143,16 @@ function resolveAwalBinary(): string {
   );
 
   if (fs.existsSync(localBinary)) {
-    return localBinary;
+    return {
+      binary: localBinary,
+      prefixArgs: [],
+    };
   }
 
-  return process.platform === "win32" ? "npx.cmd" : "npx";
+  return {
+    binary: process.platform === "win32" ? "npx.cmd" : "npx",
+    prefixArgs: ["awal"],
+  };
 }
 
 /**
