@@ -7,6 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(__dirname, '..');
 const awalPackageRoot = path.join(appRoot, 'node_modules', 'awal');
 
+if (process.platform !== 'win32') {
+  console.log('[patch-awal] Non-Windows environment detected; skipping patch.');
+  process.exit(0);
+}
+
 if (!fs.existsSync(awalPackageRoot)) {
   console.log('[patch-awal] awal is not installed; skipping patch.');
   process.exit(0);
