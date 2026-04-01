@@ -12,6 +12,8 @@ import {
 import {
   listSocialIdentityLinksForBantahUser,
   logAgentAuditEvent,
+  listChatHistory,
+  saveChatMessage,
   upsertSocialIdentityLink,
 } from "../lib/persistence";
 
@@ -104,6 +106,11 @@ export async function handleWebRequest(
 
     if (req.method === "GET" && url.pathname === "/api/channel-links/twitter") {
       await handleTwitterLinkListRequest(req, url, res);
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/history") {
+      await handleHistoryRequest(req, url, res);
       return;
     }
 
@@ -260,6 +267,7 @@ async function handleChatRequest(req: IncomingMessage, res: ServerResponse): Pro
     });
 
     streamFallbackReply(res, bantahFallbackReply!);
+    persistChatTurn(bantahContext.userId, messages, bantahFallbackReply!);
     res.end();
     logAgentAuditEvent({
       channel: "web",
@@ -289,6 +297,7 @@ async function handleChatRequest(req: IncomingMessage, res: ServerResponse): Pro
       bantahUsername: bantahContext.username,
     });
     streamFallbackReply(res, reply);
+    persistChatTurn(bantahContext.userId, messages, reply);
     res.end();
     logAgentAuditEvent({
       channel: "web",
@@ -322,6 +331,7 @@ async function handleChatRequest(req: IncomingMessage, res: ServerResponse): Pro
         bantahUsername: bantahContext.username,
       });
       streamFallbackReply(res, bantahFallbackReply);
+      persistChatTurn(bantahContext.userId, messages, bantahFallbackReply);
       res.end();
       logAgentAuditEvent({
         channel: "web",
@@ -389,6 +399,7 @@ async function handleChatRequest(req: IncomingMessage, res: ServerResponse): Pro
     }
 
     sendEvent(res, { type: "done", text: fullResponse });
+    persistChatTurn(bantahContext.userId, messages, fullResponse);
     logAgentAuditEvent({
       channel: "web",
       eventType: "chat_turn_completed",
@@ -403,6 +414,7 @@ async function handleChatRequest(req: IncomingMessage, res: ServerResponse): Pro
   } catch (error) {
     if (bantahFallbackReply && isLikelyModelAvailabilityError(error)) {
       streamFallbackReply(res, bantahFallbackReply);
+      persistChatTurn(bantahContext.userId, messages, bantahFallbackReply);
       res.end();
       logAgentAuditEvent({
         channel: "web",
@@ -481,6 +493,25 @@ async function handleTwitterLinkListRequest(
       twitter: listSocialIdentityLinksForBantahUser("twitter", bantahContext.userId),
     },
   });
+}
+
+async function handleHistoryRequest(
+  req: IncomingMessage,
+  url: URL,
+  res: ServerResponse,
+): Promise<void> {
+  const bantahContext = await resolveBantahUserContext({
+    headers: req.headers,
+    queryBantahUserId: url.searchParams.get("bantahUserId")?.trim() || undefined,
+  });
+
+  if (!bantahContext.userId) {
+    writeJson(res, 401, { error: "Bantah sign-in required before loading history." });
+    return;
+  }
+
+  const messages = listChatHistory(bantahContext.userId);
+  writeJson(res, 200, { messages });
 }
 
 async function handleTwitterLinkRequest(
@@ -602,6 +633,34 @@ function streamFallbackReply(res: ServerResponse, reply: string): void {
 function writeJson(res: ServerResponse, statusCode: number, payload: unknown): void {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
+}
+
+function persistChatTurn(
+  bantahUserId: string | null | undefined,
+  messages: ExampleMessage[],
+  assistantReply: string,
+): void {
+  if (!bantahUserId) {
+    return;
+  }
+
+  const latestUser = [...messages].reverse().find(message => message.role === "user");
+  if (latestUser && latestUser.content.trim()) {
+    saveChatMessage(bantahUserId, {
+      role: "user",
+      content: latestUser.content.trim(),
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  const trimmedReply = assistantReply.trim();
+  if (trimmedReply) {
+    saveChatMessage(bantahUserId, {
+      role: "assistant",
+      content: trimmedReply,
+      createdAt: new Date().toISOString(),
+    });
+  }
 }
 
 if (require.main === module) {

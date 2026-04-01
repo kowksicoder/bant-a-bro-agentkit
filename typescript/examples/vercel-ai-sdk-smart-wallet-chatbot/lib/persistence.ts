@@ -35,6 +35,12 @@ export type AgentAuditEvent = {
   metadata?: JsonRecord | null;
 };
 
+export type StoredChatMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+  createdAt: string;
+};
+
 let database: DatabaseSync | null = null;
 
 function getEnv(name: string): string {
@@ -115,6 +121,17 @@ function getDatabase(): DatabaseSync {
       metadata_json TEXT,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS chat_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bantah_user_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_chat_history_bantah_user
+      ON chat_history(bantah_user_id, created_at);
   `);
 
   database = db;
@@ -443,4 +460,44 @@ export function logAgentAuditEvent(event: AgentAuditEvent): void {
     event.metadata ? JSON.stringify(event.metadata) : null,
     nowIso(),
   );
+}
+
+export function saveChatMessage(bantahUserId: string, message: StoredChatMessage): void {
+  const db = getDatabase();
+  db.prepare(`
+      INSERT INTO chat_history (
+        bantah_user_id,
+        role,
+        content,
+        created_at
+      )
+      VALUES (?, ?, ?, ?)
+    `).run(
+    String(bantahUserId || "").trim(),
+    message.role,
+    message.content,
+    message.createdAt,
+  );
+}
+
+export function listChatHistory(bantahUserId: string): StoredChatMessage[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(`
+        SELECT role, content, created_at
+        FROM chat_history
+        WHERE bantah_user_id = ?
+        ORDER BY created_at ASC, id ASC
+      `)
+    .all(String(bantahUserId || "").trim()) as Array<{
+      role: "user" | "assistant" | "system";
+      content: string;
+      created_at: string;
+    }>;
+
+  return rows.map(row => ({
+    role: row.role,
+    content: row.content,
+    createdAt: row.created_at,
+  }));
 }

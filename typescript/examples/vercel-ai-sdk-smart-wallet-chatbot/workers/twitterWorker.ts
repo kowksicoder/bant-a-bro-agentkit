@@ -1,4 +1,5 @@
 import * as dotenv from "dotenv";
+import { createServer } from "http";
 import { generateText } from "ai";
 import { createExampleAgent, formatToolOutput, type ExampleAgent } from "../lib/agent";
 import {
@@ -20,11 +21,31 @@ import {
   validateTwitterEnvironment,
   type TwitterMention,
 } from "../lib/twitter";
+import { stripBoldMarkers } from "../lib/formatting";
 
 dotenv.config();
 
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = Math.max(
+  5_000,
+  Number(process.env.TWITTER_POLL_INTERVAL_MS || "30000"),
+);
 const agentCache = new Map<string, Promise<ExampleAgent>>();
+
+function startWorkerHealthServer() {
+  const port = Number(process.env.PORT || "");
+  if (!port) {
+    return;
+  }
+
+  const server = createServer((_, res) => {
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: true, service: "bantabro-worker" }));
+  });
+
+  server.listen(port, () => {
+    console.log(`Worker health server ready at http://localhost:${port}`);
+  });
+}
 
 async function getReplyAgent(bantahUserId?: string | null): Promise<ExampleAgent> {
   const cacheKey = String(bantahUserId || "").trim() || "public";
@@ -164,11 +185,11 @@ Mention author username: ${mention.authorUsername || "unknown"}`,
  * @returns Promise that runs until the worker exits
  */
 async function processMentions() {
-  validateTwitterEnvironment();
+  validateTwitterEnvironment({ requireWrite: true });
 
   const publicAgent = await getReplyAgent();
 
-  console.log("Twitter worker started. Polling every 15 seconds.");
+  console.log(`Twitter worker started. Polling every ${Math.round(POLL_INTERVAL_MS / 1000)} seconds.`);
   if (Object.keys(publicAgent.twitterReplyTools).length > 0) {
     console.log(
       "Twitter reply tools enabled. Public Bantah reads are available, and linked Bantah users can access protected Bantah tools when safe.",
@@ -201,7 +222,9 @@ async function processMentions() {
 
         try {
           const agent = await getReplyAgent(linkedIdentity?.bantahUserId);
-          const replyText = await generateReply(agent, mention, linkedIdentity);
+          const replyText = stripBoldMarkers(
+            await generateReply(agent, mention, linkedIdentity),
+          );
           if (!replyText) {
             throw new Error("Generated reply was empty.");
           }
@@ -260,6 +283,7 @@ async function processMentions() {
 }
 
 if (require.main === module) {
+  startWorkerHealthServer();
   processMentions().catch(error => {
     console.error("Fatal worker error:", error);
     process.exit(1);

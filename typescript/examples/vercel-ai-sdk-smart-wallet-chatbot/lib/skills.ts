@@ -6,7 +6,8 @@ export type BantABroSkill = {
     | "twitter-wallet-redirect"
     | "viral-twitter-replies"
     | "onboarding-assistant"
-    | "language-adaptation";
+    | "language-adaptation"
+    | "emoji-tone";
   instructions: string;
 };
 
@@ -65,6 +66,11 @@ export function getBantABroSkills(): BantABroSkill[] {
       instructions:
         "Match the user's language and tone when it is safe and clear to do so. You may respond in standard English or Nigerian Pidgin English if the user speaks that way or asks for it. Keep Pidgin natural, respectful, and easy to understand. Do not force slang when the user is speaking formal English.",
     },
+    {
+      name: "emoji-tone",
+      instructions:
+        "Keep the tone friendly and fun by adding light, relevant emojis. Use 1 to 3 emojis max per response, placed near the sentence they relate to. Avoid emojis in error messages, security warnings, legal/compliance notes, or when the user is clearly upset or wants a formal answer.",
+    },
   ];
 }
 
@@ -99,6 +105,7 @@ export function buildTwitterWorkerSkillsPrompt(
 ${linkedBantahRule}
 - Bantah public-read rule: You may use public Bantah read tools to answer safe public questions such as listing open challenges or describing a specific challenge by id.
 - viral-twitter-replies: Keep the reply concise, human, direct, and socially native.
+- emoji-tone: You may add 1 emoji to a reply when it fits the tone. Keep it subtle and avoid emojis in redirects or warnings.
 - onboarding-assistant: If the user seems new, explain only the next step they should take.
 - language-adaptation: If the user writes in Nigerian Pidgin or asks for it, you may reply in clean, natural Nigerian Pidgin.`;
 }

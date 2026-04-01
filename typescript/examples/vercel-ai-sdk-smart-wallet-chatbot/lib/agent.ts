@@ -53,7 +53,15 @@ import {
 } from "./bantah";
 import { buildKnowledgePrompt } from "./knowledge";
 import { buildSkillsPrompt } from "./skills";
-import { getMentions, hasTwitterCredentials, postTweet, replyToTweet } from "./twitter";
+import { stripBoldMarkers } from "./formatting";
+import {
+  getMentions,
+  hasTwitterCredentials,
+  likeTweet,
+  postTweet,
+  replyToTweet,
+  retweetTweet,
+} from "./twitter";
 
 type WalletData = {
   smartAccountName?: string;
@@ -83,6 +91,15 @@ export type ExampleAgentOptions = {
 };
 
 let exampleAgentPromise: Promise<ExampleAgent> | null = null;
+
+function getMaxToolSteps(): number {
+  const raw = Number(process.env.BANTABRO_MAX_TOOL_STEPS || "");
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return 8;
+  }
+
+  return Math.max(1, Math.min(Math.floor(raw), 12));
+}
 
 function getOpenRouterApiKey(): string {
   return String(process.env.OPENROUTER_API_KEY || "").trim();
@@ -294,7 +311,7 @@ async function createExampleAgentInternal(
       bantahUserContextAvailable,
       bantahPublicEnabled: bantahPublicAvailability.enabled,
     }),
-    stopWhen: stepCountIs(10),
+    stopWhen: stepCountIs(getMaxToolSteps()),
     tools,
     twitterReplyTools,
     walletTools,
@@ -361,7 +378,7 @@ function createTwitterTools(): ToolSet {
       execute: async ({ text }) => ({
         success: true,
         action: "post_tweet",
-        tweet: await postTweet(text),
+        tweet: await postTweet(stripBoldMarkers(text)),
       }),
     }),
     get_mentions: tool({
@@ -384,7 +401,31 @@ function createTwitterTools(): ToolSet {
       execute: async ({ tweetId, text }) => ({
         success: true,
         action: "reply_to_tweet",
-        tweet: await replyToTweet(tweetId, text),
+        tweet: await replyToTweet(tweetId, stripBoldMarkers(text)),
+      }),
+    }),
+    like_tweet: tool({
+      description:
+        "Like a tweet by tweet ID. Use this when the user explicitly asks to like a tweet.",
+      inputSchema: z.object({
+        tweetId: z.string().min(1).describe("The tweet ID to like."),
+      }),
+      execute: async ({ tweetId }) => ({
+        success: true,
+        action: "like_tweet",
+        result: await likeTweet(tweetId),
+      }),
+    }),
+    retweet_tweet: tool({
+      description:
+        "Retweet a tweet by tweet ID. Use this when the user explicitly asks to retweet a tweet.",
+      inputSchema: z.object({
+        tweetId: z.string().min(1).describe("The tweet ID to retweet."),
+      }),
+      execute: async ({ tweetId }) => ({
+        success: true,
+        action: "retweet_tweet",
+        result: await retweetTweet(tweetId),
       }),
     }),
   };
@@ -955,6 +996,8 @@ If Agentic Wallet authentication is missing, help the user sign in first before 
     ? `You can also manage Twitter (X) activity. Use post_tweet when the user wants to publish a tweet.
 Use get_mentions when the user asks to check mentions or when you need the latest mention before replying.
 Use reply_to_tweet when the user asks you to answer a mention or a specific tweet.
+Use like_tweet when the user wants to like a tweet.
+Use retweet_tweet when the user wants to retweet a tweet.
 If the user says "Reply to my latest mention", call get_mentions first, choose the newest relevant mention, then call reply_to_tweet.`
     : "Twitter (X) tools are not available right now because the required Twitter credentials are missing.";
 

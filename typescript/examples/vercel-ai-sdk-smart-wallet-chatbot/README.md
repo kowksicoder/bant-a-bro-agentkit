@@ -54,6 +54,14 @@ The Twitter tools are:
 - `post_tweet`
 - `get_mentions`
 - `reply_to_tweet`
+- `like_tweet`
+- `retweet_tweet`
+
+TwitterAPI.io notes:
+
+- Set `TWITTER_PROVIDER=twitterapi_io` to use TwitterAPI.io instead of the X API v2 SDK.
+- Read-only calls (mentions, feeds) require `TWITTERAPI_IO_KEY` + `TWITTERAPI_IO_USERNAME`.
+- Write actions (post/reply/like/retweet) require `TWITTERAPI_IO_LOGIN_COOKIES` and `TWITTERAPI_IO_PROXY`.
 
 The Bantah tools are:
 
@@ -78,6 +86,8 @@ The Bantah tools are:
 - for "Post this tweet: ..." it should call `post_tweet`
 - for "Check my mentions" it should call `get_mentions`
 - for "Reply to my latest mention" it should call `get_mentions` first, then `reply_to_tweet`
+- for "Like tweet 1901234567890123456" it should call `like_tweet`
+- for "Retweet 1901234567890123456" it should call `retweet_tweet`
 - for "Show open Bantah challenges" it should call `bantah_list_challenges`
 - for "Get Bantah challenge 42" it should call `bantah_get_challenge`
 - for "Create a Bantah challenge..." it should call `bantah_create_challenge`
@@ -156,6 +166,7 @@ You will need:
 - [CDP API Key](https://portal.cdp.coinbase.com/access/api)
 - [OpenRouter API Key](https://openrouter.ai/)
 - [Twitter (X) Developer credentials](https://developer.x.com/en/portal/dashboard)
+- [TwitterAPI.io API Key](https://twitterapi.io/) (optional alternative provider)
 
 Rename `.env-local` to `.env` and fill in:
 
@@ -171,6 +182,12 @@ Rename `.env-local` to `.env` and fill in:
 - `TWITTER_API_SECRET`
 - `TWITTER_ACCESS_TOKEN`
 - `TWITTER_ACCESS_TOKEN_SECRET`
+- `TWITTER_PROVIDER` optional, set to `twitterapi_io` to use TwitterAPI.io instead of X API v2
+- `TWITTERAPI_IO_KEY` required when using TwitterAPI.io
+- `TWITTERAPI_IO_USERNAME` the bot account handle to pull mentions for
+- `TWITTERAPI_IO_LOGIN_COOKIES` required for TwitterAPI.io write actions (post/reply/like/retweet)
+- `TWITTERAPI_IO_PROXY` required for TwitterAPI.io write actions
+- `TWITTERAPI_IO_BASE_URL` optional, defaults to `https://api.twitterapi.io`
 - `BANTAH_OFFCHAIN_BASE_URL` optional, enables offchain Bantah tools
 - `BANTAH_ONCHAIN_BASE_URL` optional, enables onchain Bantah tools
 - `BANTAH_AGENT_TOKEN_SECRET` required for Bantah delegated auth
@@ -186,6 +203,7 @@ Rename `.env-local` to `.env` and fill in:
 - `BANTAH_ALLOW_DEV_CONTEXT_FALLBACK` optional, defaults to `true` outside production
 - `BANTAH_CONTEXT_HEADER_SECRET` optional, lets a trusted Bantah proxy inject `x-bantah-user-id` style headers safely
 - `BANTABRO_FORCE_KNOWLEDGEBASE_MODE` optional, serves Bantah informational answers from the local knowledge base without calling the model
+- `BANTABRO_MAX_TOOL_STEPS` optional, limits tool-call steps per turn (default 8). Lower = faster, higher = more thorough.
 - `NETWORK_ID` optional, defaults to `base-sepolia`
 
 Bantah notes:
@@ -332,6 +350,12 @@ Recommended Railway setup:
    - `TWITTER_API_SECRET`
    - `TWITTER_ACCESS_TOKEN`
    - `TWITTER_ACCESS_TOKEN_SECRET`
+   - or use TwitterAPI.io by setting:
+     - `TWITTER_PROVIDER=twitterapi_io`
+     - `TWITTERAPI_IO_KEY`
+     - `TWITTERAPI_IO_USERNAME`
+     - `TWITTERAPI_IO_LOGIN_COOKIES`
+     - `TWITTERAPI_IO_PROXY`
 
 Recommended web-service extras:
 

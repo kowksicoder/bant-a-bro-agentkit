@@ -7,6 +7,7 @@ import {
   type ExampleAgent,
   type ExampleMessage,
 } from "./lib/agent";
+import { stripBoldMarkers } from "./lib/formatting";
 
 dotenv.config();
 
@@ -28,7 +29,7 @@ async function runChatMode(agent: ExampleAgent) {
   }
 
   if (agent.twitterEnabled) {
-    console.log("Twitter tools enabled: post_tweet, get_mentions, reply_to_tweet.");
+    console.log("Twitter tools enabled: post_tweet, get_mentions, reply_to_tweet, like_tweet, retweet_tweet.");
   } else {
     console.log("Twitter tools disabled. Add Twitter credentials to enable X automation.");
   }
@@ -74,10 +75,10 @@ async function runChatMode(agent: ExampleAgent) {
       }
 
       if (fullResponse) {
-        console.log("\n Response: " + fullResponse);
+        console.log("\n Response: " + stripBoldMarkers(fullResponse));
       }
 
-      messages.push({ role: "assistant", content: fullResponse });
+      messages.push({ role: "assistant", content: stripBoldMarkers(fullResponse) });
       console.log("-------------------");
     }
   } catch (error) {
@@ -126,10 +127,10 @@ async function runAutonomousMode(agent: ExampleAgent, interval = 10) {
       }
 
       if (fullResponse) {
-        console.log("\n Response: " + fullResponse);
+        console.log("\n Response: " + stripBoldMarkers(fullResponse));
       }
 
-      messages.push({ role: "assistant", content: fullResponse });
+      messages.push({ role: "assistant", content: stripBoldMarkers(fullResponse) });
       console.log("-------------------");
 
       await new Promise(resolve => setTimeout(resolve, interval * 1000));
