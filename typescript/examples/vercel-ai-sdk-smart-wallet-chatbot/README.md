@@ -63,6 +63,11 @@ TwitterAPI.io notes:
 - Read-only calls (mentions, feeds) require `TWITTERAPI_IO_KEY` + `TWITTERAPI_IO_USERNAME`.
 - Write actions (post/reply/like/retweet) require `TWITTERAPI_IO_LOGIN_COOKIES` and `TWITTERAPI_IO_PROXY`.
 
+ElizaOS Twitter notes:
+
+- Set `TWITTER_WORKER_PROVIDER=eliza` to run the ElizaOS Twitter worker.
+- ElizaOS uses OAuth 1.0a credentials and expects `TWITTER_API_SECRET_KEY` (in addition to the standard Twitter keys).
+
 The Bantah tools are:
 
 - `bantah_list_challenges`
@@ -291,14 +296,20 @@ From `typescript/examples/vercel-ai-sdk-smart-wallet-chatbot` in a separate term
 pnpm start:worker
 ```
 
-The worker:
+The default worker:
 
-- polls mentions every 15 seconds
+- polls mentions on the configured interval
 - logs each new mention
 - resolves whether the mention author is linked to a Bantah user
 - asks the agent to draft a reply
 - sends the reply with `replyToTweet`
 - stores processed mention IDs and link state in the SQLite persistence store
+
+To run the ElizaOS Twitter worker instead:
+
+```bash
+pnpm start:worker:eliza
+```
 
 ## Deploy on Railway
 
@@ -348,8 +359,14 @@ Recommended Railway setup:
 7. Add Twitter credentials to the worker service:
    - `TWITTER_API_KEY`
    - `TWITTER_API_SECRET`
+   - `TWITTER_API_SECRET_KEY` (required for ElizaOS worker)
    - `TWITTER_ACCESS_TOKEN`
    - `TWITTER_ACCESS_TOKEN_SECRET`
+   - if using ElizaOS worker:
+     - `TWITTER_WORKER_PROVIDER=eliza`
+     - `TWITTER_POLL_INTERVAL` (seconds, optional)
+     - `TWITTER_AUTO_RESPOND_MENTIONS=true`
+     - `TWITTER_AUTO_RESPOND_REPLIES=true`
    - or use TwitterAPI.io by setting:
      - `TWITTER_PROVIDER=twitterapi_io`
      - `TWITTERAPI_IO_KEY`

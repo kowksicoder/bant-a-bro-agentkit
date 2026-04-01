@@ -14,6 +14,7 @@
     "start": "tsx ./chatbot.ts",
     "start:web": "tsx ./web/server.ts",
     "start:worker": "tsx ./workers/twitterWorker.ts",
+    "start:worker:eliza": "tsx ./workers/elizaTwitterWorker.ts",
     "start:railway": "node ./scripts/railway-start.mjs",
     "dev": "nodemon ./chatbot.ts",
     "dev:web": "nodemon ./web/server.ts",
@@ -24,6 +25,10 @@
     "format:check": "prettier -c .prettierrc --check \"**/*.{ts,js,cjs,json,md}\""
   },
   "dependencies": {
+    "@elizaos/core": "^1.4.0",
+    "@elizaos/plugin-bootstrap": "^1.4.0",
+    "@elizaos/plugin-openrouter": "^1.4.0",
+    "@elizaos/plugin-twitter": "^1.4.0",
     "@ai-sdk/openai": "^3.0.0",
     "@coinbase/agentkit": "^0.10.4",
     "ai": "^6.0.0",
